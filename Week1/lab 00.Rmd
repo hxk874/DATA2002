@@ -1,0 +1,152 @@
+---
+title: "Week 1 Lab 00."
+date: "2024-08-01"
+author: "Ellen Ebdrup"
+output: 
+  html_document: 
+    ### IMPORTANT ###
+    # self_contained: true # Creates a single HTML file as output
+    code_folding: show # Code folding; allows you to show/hide code chunks
+    ### USEFUL ###
+    code_download: true # Includes a menu to download the code file
+    ### OPTIONAL ###
+    df_print: paged # Sets how dataframes are automatically printed
+    theme: readable # Controls the font, colours, etc.
+    toc: true # (Useful) Creates a table of contents!
+    toc_float: true # table of contents at the side
+    number_sections: false # (Optional) Puts numbers next to heading/subheadings
+---
+# install tidyverse, palmerpenguins and janitor
+
+Load libraries
+```{r}
+library("tidyverse")
+library("palmerpenguins")
+```
+
+Get a glimpse of the penguins data set
+```{r}
+glimpse(penguins_raw)
+```
+Clean the column names using janitor.clean_names()
+
+```{r}
+old_names = colnames(penguins_raw)
+penguins = penguins_raw %>%
+    janitor::clean_names()
+```
+
+```{r}
+new_names = colnames(penguins)
+dplyr::bind_cols(original = old_names, clean = new_names)
+```
+
+Be aware that the aes() is the new cleaned column names 
+geom_point() adds the points 
+
+```{r}
+library("ggplot2")
+penguins %>% 
+  ggplot() + 
+  # add the aesthetics
+  aes(x = body_mass_g, 
+      y = flipper_length_mm,
+      colour = species) +
+  # add a geometry
+  geom_point() + 
+  # tidy up the labels
+  labs(x = "Body mass (g)",
+       y = "Flipper length (mm)",
+       colour = "Species")
+```
+
+
+
+```{r}
+penguins = penguins |>
+    mutate(species = stringr::word(species, start = 1, end = 1))
+library("ggplot2")
+penguins %>% 
+  ggplot() + 
+  # add the aesthetics
+  aes(x = body_mass_g, 
+      y = flipper_length_mm,
+      colour = species) +
+  # add a geometry
+  geom_point() + 
+  # tidy up the labels
+  labs(x = "Body mass (g)",
+       y = "Flipper length (mm)",
+       colour = "Species")
+
+ggsave(filename = "myfirstggplot.png")
+```
+
+
+## 2.2.1 Exercises
+
+1. Generate a scatter plot for another pair of (numeric) variables.
+2. Colour by sex and use facet_wrap() to generate a plot for each species and island combination.
+3. Try including a line of best fit by adding another geometry layer geom_smooth(method = "lm").
+
+```{r}
+penguins %>% 
+  drop_na(sex) %>%
+  ggplot() + 
+  
+  # add the aesthetics
+  aes(x = culmen_length_mm, 
+      y = flipper_length_mm,
+      colour = sex) +
+  
+  # add a geometry
+  geom_point(alpha = 0.5) + 
+  facet_wrap(vars(species, island)) +
+  geom_smooth(method = "lm", se = FALSE) +
+  
+  # tidy up the labels
+  labs(x = "Culmen length (mm)",
+       y = "Flipper length (mm)",
+       colour = "Sex") +
+  scale_color_brewer(palette = "Set1") + 
+  theme(legend.position = "bottom")
+
+ggsave(filename = "my_awesme_plot.png")
+readr::write_csv(penguins, file = "penguins_cleaned.csv")
+```
+
+4. Use a different geometry, geom_histogram() to create a histogram for flipper length, coloured by species.
+
+```{r}
+penguins %>% 
+  drop_na(sex) %>%
+  ggplot() + 
+  
+  # add the aesthetics
+  aes(x = flipper_length_mm,
+      fill = sex) +
+  geom_histogram() +
+  labs(x = "Flipper length (mm)",
+       colour = "Sex") +
+  scale_color_brewer(palette = "Set1") + 
+  theme(legend.position = "bottom")
+```
+```{r}
+# install.packages("plotly")
+library("plotly")
+myplot = penguins |> 
+  ggplot() +
+  # add the aesthetics
+  aes(x = body_mass_g,
+      y = flipper_length_mm,
+      colour = species) +
+  # add a geometry
+  geom_point() +
+  # tidy up the labels
+  labs(x = "Body mass (g)",
+       y = "Flipper length (mm)",
+       colour = "Species")
+plotly::ggplotly(myplot)
+```
+
+

@@ -1,0 +1,131 @@
+---
+title: "Lecture: Collecting data"
+date: "2024-08-19"
+author: "Ellen Ebdrup"
+output: 
+  html_document: 
+    ### IMPORTANT ###
+    # self_contained: true # Creates a single HTML file as output
+    code_folding: show # Code folding; allows you to show/hide code chunks
+    ### USEFUL ###
+    code_download: true # Includes a menu to download the code file
+    ### OPTIONAL ###
+    df_print: paged # Sets how dataframes are automatically printed
+    theme: readable # Controls the font, colours, etc.
+    toc: true # (Useful) Creates a table of contents!
+    toc_float: true # table of contents at the side
+    number_sections: false # (Optional) Puts numbers next to heading/subheadings
+---
+
+## Initial results (survival over a 20 year period)
+
+```{r}
+library(tidyverse)
+x = read_csv("data/appleton1996.csv")
+x
+```
+is called a tibble: 4 x 3
+
+
+```{r}
+x_long = tidyr::uncount(x, weights = count)
+dim(x_long)
+```
+
+```{r}
+x_long %>% dplyr::group_by(status) %>%
+  dplyr::summarise(
+    rate = sum(survival == "Died")/n()
+)
+```
+is called a tibble: 2 x 2
+
+```{r}
+x_long %>% # without group_by()
+  dplyr::summarise(
+    rate = sum(survival == "Died")/n()
+)
+```
+
+```{r}
+ggplot(x) +
+  aes(x = status,
+      y = count,
+      fill = survival) +
+  geom_bar(stat = "identity",
+           position = "fill") +
+  scale_y_continuous(
+    labels = scales::percent_format()) +
+  labs(x = "", y = "Proportion") +
+  theme_bw(base_size = 10) +
+  scale_fill_brewer(palette = "Set1")
+```
+
+## Mortality by age group
+
+```{r}
+y = read_csv("data/appleton1996_age.csv")
+dplyr::glimpse(y, width = 40)
+```
+Some conversion for easier read
+```{r}
+ytab = y %>%
+  tidyr::pivot_wider(
+    id_cols = age_group,
+    names_from = c(status, survival),
+    values_from = count,
+    names_sep = " ")
+ytab
+```
+
+```{r}
+mortality = y %>% 
+  uncount(weights = count) %>% 
+  group_by(status, age_group) %>% 
+  summarise(rate = mean(survival=="Died"))
+
+p = mortality %>% 
+  ggplot() + 
+  aes(x = age_group, y = rate, fill = status) + 
+  geom_bar(stat = "identity", 
+           position = "dodge") + 
+  theme_minimal(base_size=12) + 
+  scale_fill_brewer(palette = "Paired") + 
+  scale_y_continuous(
+    labels = scales::percent_format()) +
+  labs(title = "Mortality rates by age group",
+       y = "Mortality rate", 
+       x = "Age group", 
+       fill = "") + 
+  theme(panel.grid.major.y = element_blank(), 
+        legend.position = "bottom") + 
+  coord_flip()
+p
+```
+Notice: 
+- Not many young people died.
+- Most old people died.
+- In the middle age groups, smokers tended to have higher mortality rates than nonsmokers.
+
+```{r}
+p2 = y %>% 
+  uncount(weights = count) %>%
+  ggplot() + 
+  aes(x = age_group, fill = status) + 
+  geom_bar() + 
+  theme_minimal(base_size = 12) + 
+  scale_fill_brewer(palette = "Paired") + 
+  labs(y = "Count", 
+       x = "Age group", 
+       fill = "") + 
+  theme(panel.grid.major.y = element_blank(), 
+        legend.position = "bottom") + 
+  guides(fill = guide_legend(reverse = TRUE)) + 
+  coord_flip()
+p2
+```
+As there are many more young women who smoked than older women, and as younger
+women are expected to live longer than older women, adding all the groups together makes smoking appear to be beneficial.
+
+This is a classic example of Simpson’s paradox: 
+  a trend present within multiple groups can reverse when the groups are     combined.

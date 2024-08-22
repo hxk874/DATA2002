@@ -1,0 +1,199 @@
+---
+title: "Lecture: Chi-squared tests"
+date: "2024-08-18"
+output:
+  pdf_document:
+    toc: true
+  html_document:
+    code_folding: show
+    code_download: true
+    df_print: paged
+    theme: readable
+    toc: true
+    toc_float: true
+    number_sections: false
+---
+
+# No linkage model
+
+```{r}
+library(tidyverse)
+df = tibble(
+    phenotype = c("AB","Ab","aB","ab"),
+    y = c(128, 86, 74, 112), # observed counts
+    p = c(1/4, 1/4, 1/4, 1/4), # hypothesised proportions
+    e = sum(y) * p) # expected counts
+df
+```
+## Hypothesis
+
+$H_0$ : each of the phenotypes are equally likely vs. 
+$H_1$ : the phenotypes are not equally likely.
+
+## Assumptions
+
+Data is uniformly distributed across thee 4 categories: $p_i=0.25 \forall i$.
+
+## Investigating data
+
+```{r}
+df |> ggplot() +
+  aes(x = phenotype, y = y) +
+  geom_col(alpha = 0.6) +
+  geom_hline(yintercept = 100,
+             colour = "blue",
+             linewidth = 1) +
+  labs(x = "", y = "Count")
+```
+
+```{r}
+df = df |>
+  mutate(difference = y - e)
+```
+
+Average difference tells us nothing
+```{r}
+df |> summarise(avg_diff = mean(difference))
+```
+## Test statistic
+
+$$t_0 = \sum_{i=1}^k \frac{(y_i - e_i)^2}{e_i}$$
+```{r}
+df = df |> mutate(
+  squared_discrepency = (y-e)^2,
+  contribution = (y-e)^2/e
+)
+t0 = sum(df$contribution)
+t0
+```
+
+What does it mean that the observed test statistic is $t_0=18$?
+
+## Simulate
+
+```{r}
+n = 400 # fixed sample sized
+phenotype = c("AB", "Ab", "aB", "ab")
+no_link_p = c(1, 1, 1, 1)/4
+e = n * no_link_p # expected obs 
+
+set.seed(1)
+# create a simulation, where the counts are uniformly distributed across the 4 categories.
+sim1 = sample( 
+  x = phenotype,
+  size = n,
+  replace = TRUE,
+  prob = no_link_p)
+
+table(sim1)
+```
+
+```{r}
+barplot(table(sim1),
+        main = "Simulated counts")
+```
+
+Notice that the test static for the simulated data is a lot smaller:
+```{r}
+sim_y = table(sim1)
+sum((sim_y - e)^2/e)
+```
+
+Now simulate a lot of times.
+```{r}
+B = 3000
+sim_t_stats = vector(mode = "numeric", length = B)
+for(i in 1:B){
+  sim = sample(x = phenotype, size = n,
+               replace = TRUE, prob = no_link_p)
+  sim_y = table(sim)
+  sim_t_stats[i] = sum((sim_y - e)^2/e)
+}
+hist(sim_t_stats, main = "", breaks = 20)
+```
+
+Conclusion? 
+```{r}
+mean(sim_t_stats >= t0) # sum(sim_t_stats >= t0)/B
+```
+In 0.1% of samples when the null hypothesis is true, we got a simulated sample that was “more extreme” than our original sample.
+
+
+\textbf{Easier method without simulation}
+
+$$T = \sum_{i=1}^k \frac{(Y_i - e_i)^2}{e_i} \,\ \,\ . \text{ under } H_0 , T \sim x_{k-1-q}^2 \text{ approx }$$
+where q is the number of parameters that needs to be estimated from the sample.
+
+```{r}
+hist(sim_t_stats, main = "", breaks = 20,
+     probability = TRUE, ylim = c(0, 0.25))
+curve(dchisq(x, df = 3), add = TRUE,
+      col = "blue", lwd = 2)
+```
+
+## P-value
+
+You can use the probability density function (pdf) for $x^2(3)$: 
+$$P(X \geq 18) = 0.0004$$
+
+```{r}
+# Same results 
+pchisq(18, df = 3, lower.tail = FALSE)
+
+1 - pchisq(18, df = 3)
+```
+
+
+## Chi-squared test
+Two ways:
+```{r}
+y = df$y
+y
+
+no_link_p # = 0.25 forall 
+
+# expected counts = 100 forall
+(ey = n * no_link_p)
+
+# check e_i >= 5 = TRUE
+ey >= 5
+all(ey >= 5)
+
+# test statistic = 18
+(t0 = sum((y - ey)^2/ey))
+
+1 - pchisq(t0, df = 3) # = 0.000439
+```
+But this method is much easier:
+```{r}
+chisq.test(y, p = no_link_p)
+```
+
+
+# Linkage model
+For this model, we need to estimate a parameter $p$. 
+```{r}
+p_hat = (86+74)/400
+x = matrix(c(128, 0.5*(1-p_hat), 86, 0.5*p_hat, 
+             74, 0.5*p_hat, 112, 0.5*(1-p_hat)),
+           nrow = 2)
+colnames(x) = c("AB", "Ab", "aB", "ab") # D
+rownames(x) = c("Observed count", "Hypothesised proportion") # R
+x
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
