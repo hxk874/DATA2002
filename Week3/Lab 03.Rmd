@@ -60,6 +60,7 @@ chis
 x = matrix(c(10, 20, 90, 99980), ncol = 2)
 colnames(x) = c("Breast cancer: yes", "Breast cancer: no") # D
 rownames(x) = c("Mammogram: positive", "Mammogram: negative") # R
+x
 ```
 
 Using the code below, we have to take 1/result, since mosaic thinks the row order is reverse such that $R^-$ is first. 
