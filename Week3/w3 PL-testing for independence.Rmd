@@ -1,0 +1,87 @@
+---
+title: "Lecture: Testing for independence"
+output: html_document
+date: "2024-08-13"
+---
+
+## Prerecorded lecture
+
+# Workflow: test of independence between two variables in a 2 x 2 table
+
+
+1. Hypothesis:
+$H_0$ : $p_{ij} = p_{i \bullet} p_{\bullet j}$ for $i=1,2$ and $j=1,2$ vs $H_1$ : Not all equalities hold 
+or  
+$H_0$ :variable 1 is independent of variable 2 vs $H_1$ : the two variables are not independent.
+
+2. Assumptions: 
+Independent observations and $e_{ij} = \frac{y_{i \bullet} y_{\bullet j}}{n} \geq 5$.
+
+3. Test statistics:
+$$T = \sum_{i=1}^2 \sum_{i=j}^2 \frac{(Y_{ij} - e_{ij})^2}{e_{ij}} \,\ \,\ . \text{ under } H_0 , T \sim x_1^2 \text{ approx }$$
+
+4. Observed test statistic:
+$$t_0=\sum_{i=1}^2 \sum_{i=j}^2 \frac{(y_{ij} - y_{i \bullet} y_{\bullet j} / n)^2}{y_{i \bullet} y_{\bullet j} / n} $$
+5. P-value: 
+ $$P(T \geq t_0) = P( x_1^2 \geq t_0)$$
+
+6. Decision: 
+Reject $H_0$ if the p-value $< \alpha$.
+
+
+
+# Titanic: Adults in third class
+
+$H_0$ : gender is independent of survival for adults in third class vs 
+$H_1$ : gender and survival are not independent for adults in third class.
+
+```{r}
+titanic_df = as.data.frame(Titanic)
+head(titanic_df)
+```
+
+Who and how many survived?
+- Notice that a lot more men died compered to women. 
+```{r}
+y_mat = xtabs(Freq ~ Sex + Survived,
+              data = titanic_df)
+y_mat
+```
+
+Looking only at the 3rd class.
+```{r}
+t3a = titanic_df |> 
+  filter(Class == "3rd",
+         Age == "Adult")
+y_mat = xtabs(Freq ~ Sex + Survived,
+              data = t3a)
+y_mat
+```
+
+```{r}
+t3a |> 
+  ggplot() + 
+  aes(x = Sex, 
+      y = Freq, 
+      fill = Survived) + 
+  geom_col() + 
+  scale_fill_brewer(palette = "Set1")
+```
+
+```{r}
+y_mat
+```
+
+```{r}
+chisq.test(y_mat, 
+           correct = FALSE) # so R doesnot do any corrections for us.
+```
+Result is a very small p-value, which means that we we reject the $H_0$ hypothesis.
+We reject the null hypothesis that sex is independent of survival for adults in third class as the p-value is very small (much smaller than 0.05). 
+Hence, there is evidence to suggest that survival status of passengers on the Titanic is related to the sex of the passenger.
+
+
+# Testing for independence in general tables
+
+
+

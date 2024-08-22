@@ -1,0 +1,36 @@
+```{r}
+# Given data
+row_total_private_school <- 112 # change this given data
+column_total_love <- 77 # change this given data
+grand_total <- 214 # change this given data
+
+# Calculate the expected count
+expected_count <- (row_total_private_school * column_total_love) / grand_total
+
+# Print the result, rounded to 1 decimal place
+expected_count <- round(expected_count, 1)
+expected_count
+```
+
+```{r}
+# Create the contingency table
+# Matrix for the contingency table
+data <- matrix(c(7, 8, 0, 15), nrow = 2, byrow = TRUE)
+    colnames(data) <- c("Normalized", "Not Normalized")
+    rownames(data) <- c("Prednisolone", "Control")
+data
+
+# Perform Fisher's exact test
+fisher.test(data)
+```
+
+```{r}
+# Create the contingency table
+data <- matrix(c(17, 17, 9, 34), nrow = 2, byrow = TRUE,
+               dimnames = list(Smoking = c("History of smoking", "Never smoked"),
+                               MI_Status = c("Acute MI Cases", "Controls")))
+data
+# Perform Fisher's exact test
+fisher.test(data)
+```
+

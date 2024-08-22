@@ -1,0 +1,102 @@
+---
+title: "Lecture: Testing for homogeneity"
+output: html_document
+date: "2024-08-12"
+---
+
+```{r}
+library(tidyverse)
+dat = read_csv("https://raw.githubusercontent.com/DATA2002/data/master/covidplasma.csv")
+dplyr::glimpse(dat)
+```
+
+Notice that "subject" should be an integer and not a double type representing each patient.
+
+```{r}
+dat = dat %>% 
+  # remove censored data
+  filter(outcome != "Censored") %>%
+  
+  # convert from a character type level to a factor type level
+  mutate(treatment = factor(treatment, levels = c("Plasma", "No plasma")),
+           outcome = factor(outcome, levels = c("Died", "Discharged")))
+```
+
+```{r}
+table(dat$treatment, dat$outcome)
+```
+
+Prints a nice table
+
+```{r}
+dat %>%
+  janitor::tabyl(treatment, outcome) |>
+  gt::gt()
+```
+
+
+
+```{r}
+# by default R does some corrections in the chisq.test. But we want the real asweer, therefore add the second argument. 
+chisq.test(tab, correct = FALSE)
+```
+## Proces
+
+1.  Hypothesis
+$H_0 : p_{11} = p_{21}$ and $p_{12} = p_{22}$ vs $H_1 : p_{11} \neq p_{21}$ and $p_{12} \neq p_{22}$
+
+2.  Assumption Assumptions: observations randomly sampled from two independent populations and $e_{ij} = \frac{y_{i \cdot} y_{\cdot j}}{n} \geq 5$.
+
+3.  Test Statistic 
+$$T = \sum_{i=1}^2 \sum_{i=j}^2 \frac{(Y_{ij} - e_{ij})^2}{e_{ij}} \,\ \,\  T \sim x_1^2 \text{ Under } H_0$$
+
+4.  Observed Test Statistic 
+$$t_0=\sum_{i=1}^2 \sum_{i=j}^2 \frac{(y_{ij} - e_{ij})^2}{e_{ij}} $$
+
+5.  P-value 
+$$P(T \geq t_0) = P( x_1^2 \geq t_0)$$
+
+6.  Decision
+Since the p-value is 0.1629 > 0.05, we don't reject the $H_0$ hypothesis.
+
+
+# in general tables
+```{r}
+y = c(62, 47, 29, 46, 9, 7)
+n = sum(y)
+c = 3
+r = 2
+tab = matrix(y, nrow = r, ncol = c)  
+# default is to fill by column
+colnames(tab) = c("Approve ", 
+                  " Not approve ",
+                  " No comment")
+rownames(tab) = c("Labor", "Liberal")
+tab
+```
+
+```{r}
+chisq.test(tab, correct = FALSE)
+```
+
+
+## Proces
+
+1.  Hypothesis
+$H_0 : p_{1j} = p_{2j} = ... = p_{rj}$ for $j=1,2...,c$ vs $H_1$ : Not all equalities hold.
+
+or 
+
+$H_0$ : the proportions of approve, not approve and no comment are homogenous across Liberal and Labour voters vs. $H_1$ : the proportions of approve, not approve and no comment are not the same across Liberal and Labour voters.
+
+2.  Assumption 
+Assumptions: $e_{ij} = \frac{y_{i \cdot} y_{\cdot j}}{n} \geq 5$ and independent observations sampled from the  populations
+
+3.  Test Statistic $$T = \sum_{i=1}^r \sum_{i=j}^c \frac{(Y_{ij} - e_{ij})^2}{e_{ij}} \,\ \,\  T \sim x_{(r-1)(c-1)}^2 \text{ approx }$$
+
+4.  Observed Test Statistic $$t_0=\sum_{i=1}^r \sum_{i=j}^c \frac{(y_{ij} - e_{ij})^2}{e_{ij}} $$
+
+5.  P-value $$P(T \geq t_0) = P( x_{(r-1)(c-1)}^2 \geq t_0)$$
+
+6.  Decision
+The p-value is less than 0.05, therefore at the 5% level of significance, we reject the null hypothesis and conclude that voter preferences about the new tax reform package are not homogenous across Liberal and Labour voters.
