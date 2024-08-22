@@ -1,0 +1,57 @@
+---
+title: "Week 2 Lecture code"
+date: "2024-08-04"
+author: "Ellen Ebdrup"
+output: 
+  html_document: 
+    ### IMPORTANT ###
+    # self_contained: true # Creates a single HTML file as output
+    code_folding: show # Code folding; allows you to show/hide code chunks
+    ### USEFUL ###
+    code_download: true # Includes a menu to download the code file
+    ### OPTIONAL ###
+    df_print: paged # Sets how dataframes are automatically printed
+    theme: readable # Controls the font, colours, etc.
+    toc: true # (Useful) Creates a table of contents!
+    toc_float: true # table of contents at the side
+    number_sections: false # (Optional) Puts numbers next to heading/subheadings
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+G_P <- c(417, 94)   # 511    # TP FP
+G_N <- c(18, 99471) # 99489  # FN TN
+     #   435  99565
+
+HR_P <- c(324, 31)
+HR_N <- c(9, 9636)
+```
+
+False negative: # c / (a+c)
+```{r}
+18 / 435
+```
+Recall:
+```{r}
+417 / 435
+```
+P(D^- | S^-) =  
+```{r}
+99471 / 99565
+```
+P(D^+ | S^+) =
+```{r}
+417 / 511
+```
+
+
+
+
+
+
+
+
+

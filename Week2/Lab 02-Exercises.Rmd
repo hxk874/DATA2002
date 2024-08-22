@@ -1,0 +1,55 @@
+---
+title: "Lab 02-Exercises"
+output: html_document
+date: "2024-08-08"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+4.1 Tablet devises
+
+Observed chi squared test
+
+We always assume H0 is true. 
+
+```{r}
+y_i = c(102, 32, 12, 4) # actual value
+p_i = c(0.69, 0.21, 0.07, 0.03) # H0 distribution
+n = sum(y_i) # 150
+e_i = n * p_i # expected values
+```
+
+combine the last two groups since there appear frequency values below 5.
+```{r}
+y_i = c(102, 32, 12 + 4) # actual value
+p_i = c(0.69, 0.21, 0.07 + 0.03) # H0 distribution
+n = sum(y_i) # 150
+e_i = n * p_i # expected values
+```
+
+Use formula from slides
+```{r}
+t0 = sum((y_i - e_i)^2 / e_i)
+```
+How well does our observed data fit the expected data?
+
+Since t0 = 0.0963, we will now find the p-value
+
+if p-val is < 0.05 => reject
+if p-val is > 0.05 => reject
+
+```{r}
+p_value = pchisq(t0, df=2, lower.tail = FALSE)
+p_value 
+```
+
+```{r}
+chisq.test(y_i, p=p_i)
+```
+
+
+
+
+

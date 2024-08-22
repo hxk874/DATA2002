@@ -1,0 +1,89 @@
+---
+title: "Week 2 Lecture code"
+date: "2024-08-04"
+author: "Ellen Ebdrup"
+output: 
+  html_document: 
+    ### IMPORTANT ###
+    # self_contained: true # Creates a single HTML file as output
+    code_folding: show # Code folding; allows you to show/hide code chunks
+    ### USEFUL ###
+    code_download: true # Includes a menu to download the code file
+    ### OPTIONAL ###
+    df_print: paged # Sets how dataframes are automatically printed
+    theme: readable # Controls the font, colours, etc.
+    toc: true # (Useful) Creates a table of contents!
+    toc_float: true # table of contents at the side
+    number_sections: false # (Optional) Puts numbers next to heading/subheadings
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+plot(table(rpois(n=10000, lambda=2)), ylab = "Count")
+```
+```{r}
+rpois(n=10000, lambda=6) |> table() |> plot(ylab = "Count")
+```
+
+
+```{r}
+y = c(117, 94, 51, 15, 0, 0, 0, 1) # input the observed counts
+x = 0:7 # define the corresponding groups
+n = sum(y) # total number of samples (sample size)
+k = length(y) # number of groups
+(lam = sum(y * x)/n) # estimate the lambda parameter
+
+p = dpois(x, lambda = lam) # obtain the p_i from the Poisson pmf
+
+p[8] = 1 - sum(p[1:7]) # redefine the 8th element P(>=7) NOT P(7)
+round(p, 5)
+
+(ey = n * p) # calculate the expected frequencies
+
+ey >= 5 #check assumption e_i >= 5 not all satisfied
+
+(yr = c(y[1:3], sum(y[4:8]))) # reduced category counts
+
+(eyr = c(ey[1:3], sum(ey[4:8]))) # reduced category expected cell counts
+
+all(eyr >= 5) # check that all expected cell counts are >= 5
+
+(pr = c(p[1:3], sum(p[4:8]))) # reduced category hypothesised probabilities
+
+kr = length(yr) # number of combined classes
+(t0 = sum((yr - eyr)^2/eyr)) # test statistic
+
+(pval = 1 - pchisq(t0, df = kr - 1 - 1)) # p-value
+```
+Chi-squared test:
+```{r}
+chisq = chisq.test(yr, p = pr)
+```
+
+
+```{r}
+pchisq(unname(chisq$statistic), df = 2, lower.tail = FALSE)
+```
+
+```{r}
+xr = c("0", "1", "2", ">=3") # group labels
+barplot(yr, names.arg = xr, main = "Observed frequency")
+barplot(eyr, names.arg = xr, main = "Expected frequency")
+```
+
+```{r}
+library("ggplot2")
+dat = tibble::tibble(aberrations = 
+                    factor(xr,levels = c("0","1","2",">=3")),
+                    observed = yr,expected = eyr)
+dat |> ggplot() +
+  aes(x = aberrations, y = observed) +
+  geom_col(alpha = 0.5) +
+  geom_point(aes(y = eyr), colour = "blue", size = 6) +
+  labs(y = "Count", x = "Number of aberrations") +
+  theme_classic(base_size = 40)
+```
+

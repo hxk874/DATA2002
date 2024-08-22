@@ -1,0 +1,84 @@
+---
+title: "Lab 02-Tablet Devices"
+date: "2024-08-08"
+author: "Ellen Ebdrup"
+output: 
+  html_document: 
+    ### IMPORTANT ###
+    # self_contained: true # Creates a single HTML file as output
+    code_folding: show # Code folding; allows you to show/hide code chunks
+    ### USEFUL ###
+    code_download: true # Includes a menu to download the code file
+    ### OPTIONAL ###
+    df_print: paged # Sets how dataframes are automatically printed
+    theme: readable # Controls the font, colours, etc.
+    toc: true # (Useful) Creates a table of contents!
+    toc_float: true # table of contents at the side
+    number_sections: false # (Optional) Puts numbers next to heading/subheadings
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+4.1 Tablet devises
+
+Observed chi squared test
+
+We always assume H0 is true. 
+
+```{r}
+y_i = c(102, 32, 12, 4) # actual value
+p_i = c(0.69, 0.21, 0.07, 0.03) # H0 distribution
+n = sum(y_i) # 150
+e_i = n * p_i # expected values
+```
+
+combine the last two groups since there appear frequency values below 5.
+```{r}
+y_i = c(102, 32, 12 + 4) # actual value
+p_i = c(0.69, 0.21, 0.07 + 0.03) # H0 distribution
+n = sum(y_i) # 150
+e_i = n * p_i # expected values
+```
+
+Use formula from slides
+```{r}
+t0 = sum((y_i - e_i)^2 / e_i)
+```
+How well does our observed data fit the expected data?
+
+Since t0 = 0.0963, we will now find the p-value
+
+if p-val is < 0.05 => reject
+if p-val is > 0.05 => don't reject
+
+```{r}
+p_value = pchisq(t0, df=2, lower.tail = FALSE)
+p_value 
+```
+
+Easier code: Same as above but much simpler
+```{r}
+chisq.test(y_i, p=p_i)
+```
+
+1. Hypothesis 
+
+$H_0 : p_1 =0.69, p_2=0.21, p_3=0.1$ vs $H_1$ : At least one of the equalities doesn't hold.
+
+2. Assumption
+Observations are randomly selected & independent of each other and $e_i = np_i \geq 5 \forall i$. 
+
+3. Test Statistic
+$$T=\sum_{i=1}^3 \frac{(Y_i - e_i)^2}{e_i} \sim x_2^2 \text{ Under } H_0$$
+
+4. Observed Test Statistic
+$$t_0=\sum_{i=1}^3 \frac{(y_i - e_i)^2}{e_i} \sim x_2^2 \text{ Under } H_0 = 0.096$$
+
+5. P-value
+$$P(T \geq t_0) = P( x_2^2 \geq 0.0963) = 0.953$$
+
+6. Decision
+Since the p-value is greater than $\alpha=0.05$ (0.953 > 0.05), we don’t reject $H_0$, meaning that the data is consistent with the distribution of tablet devices in 2012.
+

@@ -1,0 +1,63 @@
+---
+title: "Lab 02-Smoking rates"
+date: "2024-08-08"
+author: "Ellen Ebdrup"
+output: 
+  html_document: 
+    ### IMPORTANT ###
+    # self_contained: true # Creates a single HTML file as output
+    code_folding: show # Code folding; allows you to show/hide code chunks
+    ### USEFUL ###
+    code_download: true # Includes a menu to download the code file
+    ### OPTIONAL ###
+    df_print: paged # Sets how dataframes are automatically printed
+    theme: readable # Controls the font, colours, etc.
+    toc: true # (Useful) Creates a table of contents!
+    toc_float: true # table of contents at the side
+    number_sections: false # (Optional) Puts numbers next to heading/subheadings
+---
+
+A study of patients with insulin-dependent diabetes was conducted to investigate the effects of cigarette smoking on renal and retinal complications. 
+
+```{r}
+y_i = c(44, 24, 13,  19)
+p_i = c(0.5, 0.2, 0.1, 0.2)
+n = sum(y_i)
+e_i = n * p_i
+```
+
+significance = 0.01
+
+Should the researcher revise his estimates? 
+Use 0.01 as the level of significance.
+
+```{r}
+t0 = sum((y_i - e_i)^2 / e_i)
+t0
+
+p_value = pchisq(t0, df=3, lower.tail = FALSE)
+p_value 
+```
+
+Simpler:
+```{r}
+chisq.test(y_i, p=p_i)
+```
+1. Hypothesis 
+
+$H_0 : p_1 =0.5, p_2=0.2, p_3=0.1, p_4=0.2$ vs $H_1$ : At least one of the equalities doesn't hold.
+
+2. Assumption
+Observations are randomly selected & independent of each other and $e_i = np_i \geq 5 \forall i$. 
+
+3. Test Statistic
+$$T=\sum_{i=1}^4 \frac{(Y_i - e_i)^2}{e_i} \sim x_3^2 \text{ Under } H_0$$
+
+4. Observed Test Statistic
+$$t_0=\sum_{i=1}^4 \frac{(y_i - e_i)^2}{e_i} \sim x_3^2 \text{ Under } H_0 = 2.47$$
+
+5. P-value
+$$P(T \geq t_0) = P( x_3^2 \geq 2.47) = 0.481$$
+
+6. Decision
+Since the p-value is greater than $\alpha=0.05$ (2.47 > 0.05), we don’t reject $H_0$, meaning that the data is consistent with the proportions estimated by the researcher.
