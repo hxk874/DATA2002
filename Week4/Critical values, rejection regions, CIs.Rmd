@@ -1,0 +1,183 @@
+---
+title: "Prerecorded lecture: Critical values, rejection regions and confidence intervals"
+output: html_document
+date: "2024-08-20"
+---
+
+# Critical values and confidence intervals
+## Finding quantiles in R
+
+In R, we get quantiles using the qDISTRIBUTION() range of functions, fx: 
+    qt(p, df = k)       for t dist
+    qnorm(p)            for normal dist
+    qchisq(p, df = k)   for chi-squared dist
+
+```{r}
+qt(0.05, df = 5)
+```
+
+```{r}
+qnorm(0.05)
+```
+
+## Beer example
+
+```{r}
+x = c(374.8, 375.0, 375.3, 374.8, 374.4, 374.9)
+
+qt(0.975, df = 5) # = 2.57
+qt(0.995, df = 5) # = 4.03
+```
+
+```{r}
+# The sample mean:
+xbar = mean(x)
+xbar
+
+# The standard error:
+se = sd(x)/sqrt(6)
+se
+
+# The discrepancy from the “given value” 375:
+discrep=abs(xbar-375)
+discrep 
+```
+
+### Using qt()
+
+$$\alpha = 0.05 : P(t_{n-1} \leq c) = 1- \frac{\alpha}{2} = 0.975$$
+In r code, c would be
+```{r}
+qt(0.975, df = n-1)
+```
+
+
+$$\alpha = 0.01 : P(t_{n-1} \leq c) = 1- \frac{\alpha}{2} = 0.995$$
+In r code, c would be
+```{r}
+qt(0.995, df = n-1)
+```
+
+For a 95% confidence interval for $\mu$ we thus choose $c$  via
+```{r}
+c_95 = qt(0.975, df = 5)
+c_95
+# giving
+xbar + c(-1,1) * c_95 * se
+```
+Note that this includes the “special value” 375 and so is consistent with our 0.05 false-alarm rate test earlier.
+
+For a 99% confidence interval for $\mu$ we thus choose $c$ via
+```{r}
+c_99 = qt(0.995, df = 5)
+c_99
+# giving
+xbar + c(-1,1) * c_99 * se
+```
+As we’d expect, this CI is wider, and also includes 375.
+
+### Using t.test()
+
+```{r}
+# The default:
+t.test(x, mu = 375) 
+
+# Setting conf.level = 0.99:
+t.test(x, mu = 375, conf.level = 0.99)
+```
+
+
+## One sided, beer example
+
+The 95% “upper confidence limit” is
+```{r}
+c_05 = qt(.95, df = 5)
+xbar + c_05 * se
+```
+which gives the one-sided confidence interval
+```{r}
+c(-Inf, xbar + c_05 * se)
+```
+For 99%,
+```{r}
+c_01 = qt(.99, df = 5)
+c(-Inf, xbar + c_01 * se)
+```
+These both include 375!
+
+### Using t.test()
+
+```{r}
+# The default:
+t.test(x, mu = 375, alternative = "less") 
+
+# Setting conf.level = 0.99:
+t.test(x, mu = 375, alternative = "less", conf.level = 0.99)
+```
+Using the (one sided) p-value in our level of confidence gives us a confidence interval “right on the edge”.
+```{r}
+t.test(x, mu = 375, alternative = "less", conf.level = 1 - 0.1589)
+```
+
+
+
+## Two sided, beer example
+
+Using the (two sided) p-value in our level of confidence gives us a confidence interval “right on the edge”.
+```{r}
+t.test(x, mu = 375, conf.level = 1 - 0.3177)
+```
+
+# Rejection regions
+
+## Smoking and blood platelet aggregation
+
+```{r}
+before = c(25, 25, 27, 44, 30, 67, 53, 53, 52, 60, 28)
+after =  c(27, 29, 37, 36, 46, 82, 57, 80, 61, 59, 43)
+df = data.frame(before, after, difference = after - before)
+```
+Is blood platelet aggregation affected by smoking?
+
+```{r}
+n = length(df$difference)
+dbar = mean(df$difference)
+s_d = sd(df$difference)
+t0 = dbar/(s_d/sqrt(n))
+c(n, dbar, s_d, t0) |>
+  round(2)
+```
+
+
+```{r}
+alpha = 0.05
+qt(1-alpha/2, df = n - 1)
+```
+
+### Rejection region for sample mean
+
+Rescale data. 
+```{r}
+before = c(25, 25, 27, 44, 30, 67, 53, 53, 52, 60, 28)
+after =  c(27, 29, 37, 36, 46, 82, 57, 80, 61, 59, 43)
+df = data.frame(before, after, difference = after-before)
+s_d = sd(df$difference)
+s_d
+```
+
+```{r}
+n = nrow(df)
+mu0 = 0
+crit_val = qt(0.975, df = n-1)
+crit_val
+```
+
+```{r}
+rrlower = mu0 - crit_val * s_d / sqrt(n)
+rrupper = mu0 + crit_val * s_d / sqrt(n)
+c(rrlower, rrupper) |> round(2)
+```
+
+
+
+

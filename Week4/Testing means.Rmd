@@ -1,0 +1,203 @@
+---
+title: "Prerecorded lecture: Testing means"
+output: html_document
+date: "2024-08-20"
+---
+
+# One sample
+
+# Beer contents
+
+```{r}
+x = c(374.8, 375.0, 375.3, 374.8, 374.4, 374.9)
+
+mean(x)
+sd(x)
+```
+
+Is the mean beer content less than the 375 ml claimed on the label?
+Mean is the think line in horizontal in the box below, which is 374.87 < 375.
+
+```{r}
+y = c(374.8, 375.0, 375.3, 374.8, 374.4, 374.9)
+
+library("ggplot2")
+df = data.frame(y)
+set.seed(124)
+
+p1 = ggplot(df, aes(x = "", y = y)) +
+  geom_boxplot(alpha = 0.5, coef = 10) + 
+  geom_dotplot(binaxis = 'y', 
+               stackdir = 'center') + 
+  # insert the hypothesised line
+  geom_hline(yintercept = 375, 
+             colour = "blue",
+             linetype = "dashed") + 
+  labs(y = "Beer volume (ml)", x = "") +
+  theme_bw(base_size = 12) + 
+  theme(axis.ticks.x = element_blank(),
+        axis.text.x = element_blank())
+p1
+```
+
+## Hypothesis
+
+$H_0$ : $\mu = 375$ vs. $H_1$ : $\mu < 375$.
+
+## Test statistic
+$$T=\frac{\bar{X}-\mu_0}{S/ \sqrt{n}} \text{ Under } H_0, T \sim t_{n-1}$$
+
+using the R t test
+```{r}
+t.test(x, mu=mu_, alternative = "less")
+```
+or "by hand":
+```{r}
+mu_ <- 375
+mean_ <- mean(x)
+sd_ <- sd(x)
+n <- length(x)
+
+t0 <- (mean_ - mu_)/(sd_/sqrt(n))
+t0
+
+pval = pt(t0, n - 1)
+pval
+```
+
+# Two samples
+
+# Smokers and blood platelet aggregation
+
+This is a two sample test, since non_smokers and smokers and two different indpependent groups.
+```{r}
+non_smokers = c(25, 25, 27, 44, 30, 67, 
+                53, 53, 52, 60, 28)
+smokers =  c(27, 29, 37, 36, 46, 82, 
+             57, 80, 61, 59, 43)
+
+dat = data.frame(
+  platelets = c(non_smokers, smokers),
+  status = c(rep("Non smokers", 
+                 length(non_smokers)),
+             rep("Smokers", 
+                 length(smokers)))
+)
+library(dplyr)
+sum = dat %>% 
+  group_by(status) %>% 
+  summarise(Mean = mean(platelets),
+            SD = sd(platelets), 
+            n = n())
+sum
+```
+A prettier way to display data
+```{r}
+knitr::kable(sum, 
+             format = "html", 
+             digits = 1)
+```
+Is the aggregation of blood platelets affected by smoking?
+
+
+
+## Visualising blood platelet aggregation
+```{r}
+library(ggplot2)
+ggplot(dat) + aes(x = status, y = platelets) +
+  geom_boxplot() + 
+  geom_jitter(width = 0.15, size = 3, colour = "blue") + 
+  labs(x = "", y = "Blood platelet\naggregation")
+```
+
+## t test
+
+```{r}
+t.test(smokers, non_smokers,
+       alternative = "two.sided",
+       var.equal = TRUE) # default is FALSE
+```
+or "by hand"
+```{r}
+x = non_smokers 
+z = smokers
+n = length(x)
+mean(x) 
+mean(z)
+```
+
+```{r}
+sd_p_sqrd = ((n-1)*(sd(x)^2) + (n-1)*(sd(z)^2)) / (n+n-2)
+t0 = (mean(x) - mean(z)) / (sqrt(sd_p_sqrd) * sqrt(1/n + 1/n))
+t0 # take the absolute value.
+```
+
+## p-value
+
+We get the p-value from the t.test() code.
+$$2P(t_{2n-2} \geq |t_0|) = 2P(t_{20} \geq 1.14) = 0.27$$
+## Decision
+Large p-value so the data are consistent with $H_0$. 
+There does not appear to be evidence that blood platelet aggregation levels are different in smokers.
+
+## Welch statistic
+```{r}
+t.test(smokers, non_smokers, alternative = "two.sided")
+```
+# Paired samples t-test
+# Smoking and aggregation (paired)
+
+Blood samples from 11 individuals before and after they smoked a cigarette are used to measure aggregation of blood platelets.
+```{r}
+before = c(25, 25, 27, 44, 30, 67, 53, 
+           53, 52, 60, 28)
+after =  c(27, 29, 37, 36, 46, 82, 57, 
+           80, 61, 59, 43)
+df = data.frame(before, after,
+  difference = after - before)
+df
+```
+Is the aggregation affected by smoking?
+$\mu_0$ / the data should be centered around 0, if there is no difference on blood platelets depending on individuals smoked or not. 
+
+```{r}
+df %>% 
+  summarise(across(.cols = c(before, after),
+                   .fns = list(Mean = mean, 
+                               SD = sd, 
+                               n = length))) %>% 
+  pivot_longer(cols = everything(),
+               names_sep = "_",
+               names_to = c("time", ".value"))
+```
+
+```{r}
+p = ggplot(df) +
+  aes(x = "", y = difference) + 
+  geom_boxplot() +
+  geom_dotplot(binaxis = "y", stackdir = "center") +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  labs(y = 'Difference in blood platelet levels')+
+  theme(axis.title.x = element_blank(),
+        axis.text.x = element_blank(),
+        axis.ticks.x = element_blank())
+p
+```
+
+## Test statistic
+
+These two test are actually the same. 
+R does this in the background:
+The pairred t test is = one sample t test on the differences of the observations
+
+
+```{r}
+t.test(df$after, df$before, paired = TRUE)
+
+t.test(df$difference)
+```
+## Decision
+Small p-value so we reject the null hypothesis. There is evidence that blood platelet aggregation levels change after smoking.
+
+
+

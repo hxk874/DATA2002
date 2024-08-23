@@ -1,0 +1,297 @@
+---
+title: "Week 4"
+format: 
+  html:
+    code-tools: true
+    embed-resources: true
+---
+
+```{r, message=FALSE}
+library(tidyverse)
+```
+
+## One sample t-test
+
+### Beer contents
+
+```{r}
+y = c(374.8, 375.0, 375.3, 374.8, 374.4, 374.9)
+```
+
+```{r}
+df = data.frame(y)
+set.seed(124)
+p1 = ggplot(df, aes(x = "", y = y)) +
+  geom_boxplot(alpha = 0.5, coef = 10) + 
+  geom_dotplot(binaxis = 'y', 
+               stackdir = 'center') + 
+  geom_hline(yintercept = 375, 
+             colour = "blue",
+             linetype = "dashed") + 
+  labs(y = "Beer volume (ml)", x = "") +
+  theme_bw(base_size = 24) + 
+  theme(axis.ticks.x = element_blank(),
+        axis.text.x = element_blank())
+p1
+```
+
+```{r}
+x = c(374.8, 375.0, 375.3, 374.8, 374.4, 374.9)
+mean(x)
+sd(x)
+t.test(x, mu = 375, alternative = "less")
+n = length(x)
+t0 = ( mean(x)-375 ) / ( sd(x)/sqrt(n) ) 
+t0
+pval = pt(t0, n-1)
+pval
+```
+
+## Two sample t-test
+
+### Equal variance
+
+```{r}
+non_smokers = c(25, 25, 27, 44, 30, 67, 
+                53, 53, 52, 60, 28)
+smokers =  c(27, 29, 37, 36, 46, 82, 
+             57, 80, 61, 59, 43)
+dat = data.frame(
+  platelets = c(non_smokers, smokers),
+  status = c(rep("Non smokers", 
+                 length(non_smokers)),
+             rep("Smokers", 
+                 length(smokers)))
+)
+sum = dat |> 
+  group_by(status) |> 
+  summarise(Mean = mean(platelets),
+            SD = sd(platelets), 
+            n = n())
+```
+
+```{r}
+knitr::kable(sum, 
+             format = "html", 
+             digits = 1)
+gt::gt(sum) |> 
+  gt::fmt_number(columns = c("Mean","SD"), decimals = 1)
+```
+
+```{r}
+ggplot(dat) + aes(x = status, y = platelets) +
+  geom_boxplot() + 
+  geom_jitter(width = 0.15, size = 3, colour = "blue") + 
+  labs(x = "", y = "Blood platelet\naggregation")
+```
+
+```{r}
+t.test(smokers, non_smokers,
+       alternative = "two.sided",
+       var.equal = TRUE)
+```
+
+```{r}
+nS = length(smokers)
+nN = length(non_smokers)
+sS = sd(smokers)
+sN = sd(non_smokers)
+sP = sqrt(((nS - 1) * sS^2 + (nN - 1) * sN^2)/(nS + nN - 2))
+xbarS = mean(smokers)
+xbarN = mean(non_smokers)
+deg_free = nS+nN-2
+t0 = (xbarS - xbarN) / ( sP * sqrt(1/nS+1/nN) ) 
+p_val = 2*(1-pt(abs(t0),deg_free))
+c(t0, p_val)
+```
+
+### Unequal varaiances
+
+```{r}
+sum |> gt::gt() |> gt::fmt_number(columns = 2:3, decimals = 1)
+```
+
+```{r}
+t.test(smokers, non_smokers, alternative = "two.sided")
+```
+
+## Paired t-test
+
+```{r}
+before = c(25, 25, 27, 44, 30, 67, 53, 
+           53, 52, 60, 28)
+after =  c(27, 29, 37, 36, 46, 82, 57, 
+           80, 61, 59, 43)
+df = data.frame(before, after,
+  difference = after - before)
+df
+```
+
+```{r}
+df |> 
+  summarise(across(.cols = c(before, after, difference),
+                   .fns = list(Mean = mean, 
+                               SD = sd, 
+                               n = length))) |> 
+  pivot_longer(cols = everything(),
+               names_sep = "_",
+               names_to = c("time", ".value"))
+```
+
+```{r}
+p = ggplot(df) +
+  aes(x = "", y = difference) + 
+  geom_boxplot() +
+  geom_dotplot(binaxis = "y", stackdir = "center") +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  labs(y = 'Difference in blood platelet levels')+
+  theme(axis.title.x = element_blank(),
+        axis.text.x = element_blank(),
+        axis.ticks.x = element_blank())
+p
+```
+
+```{r}
+t.test(df$after, df$before, paired = TRUE)
+t.test(df$difference)
+```
+
+## Critical values, rejection regions and confidence intervals
+
+## Beer contents
+
+```{r}
+x = c(374.8, 375.0, 375.3, 374.8, 374.4, 374.9)
+mean(x)
+sd(x)
+```
+
+```{r}
+df = data.frame(x)
+set.seed(124)
+ggplot(df, aes(x = "", y = x)) +
+  geom_boxplot(alpha = 0.5, coef = 10) + 
+  geom_dotplot(binaxis = 'y', 
+               stackdir = 'center') + 
+  geom_hline(yintercept = 375, 
+             colour = "blue",
+             linetype = "dashed") + 
+  labs(y = "Beer volume (ml)", x = "") +
+  theme_bw(base_size = 34) + 
+  theme(axis.ticks.x = element_blank(),
+        axis.text.x = element_blank())
+```
+
+## Two-sided
+
+```{r}
+xbar = mean(x)
+xbar
+se = sd(x)/sqrt(6)
+se
+```
+
+```{r}
+discrep=abs(xbar-375)
+discrep 
+```
+
+Comparing the size of the discrepancy to the standard error:
+
+```{r}
+discrep/se
+```
+
+To reject the null hypothesis (at the 5% level of significance) we would want that ratio to be at least
+
+```{r}
+qt(0.975, 5)
+```
+
+95% Confidence interval
+
+```{r}
+c_95 = qt(0.975,5)
+c_95
+xbar + c(-1,1) * c_95 * se
+```
+
+99% confidence interval
+
+```{r}
+c_99 = qt(0.995,5)
+c_99
+xbar + c(-1,1)*c_99*se
+```
+
+Using `t.test()`
+
+```{r}
+t.test(x, mu = 375)
+t.test(x, mu = 375, conf.level = 0.99)
+```
+
+## One sided
+
+```{r}
+c_05 = qt(.95, 5)
+c_05
+c(xbar - 375, se)
+c_01 = qt(.99, 5)
+c_01
+c_05 = qt(.95, 5)
+xbar + c_05 * se
+c(-Inf, xbar + c_05*se)
+c_01 = qt(.99, 5)
+c(-Inf, xbar + c_01 * se)
+
+```
+
+```{r}
+t.test(x, mu = 375, alternative = "less")
+t.test(x, mu = 375, alternative = "less", conf.level = 0.99)
+t.test(x, mu = 375, conf.level = 1 - 0.3177)
+t.test(x, mu = 375, alternative = "less", conf.level = 1-0.1589)
+```
+
+## Smoking and blood platelet aggregation
+
+```{r}
+before = c(25, 25, 27, 44, 30, 67, 53, 53, 52, 60, 28)
+after =  c(27, 29, 37, 36, 46, 82, 57, 80, 61, 59, 43)
+df = data.frame(before, after, difference = after-before)
+```
+
+```{r}
+p = ggplot(df, aes(x="", y=difference)) +
+geom_boxplot() +
+geom_dotplot(binaxis = "y", stackdir = "center") +
+theme_classic(base_size = 24) +
+geom_hline(yintercept = 0, linetype='dashed') +
+labs(y = 'Difference in blood platelet levels')+
+theme(axis.title.x=element_blank(),
+axis.text.x=element_blank(),
+axis.ticks.x=element_blank())
+p
+
+```
+
+```{r}
+n = length(df$difference)
+dbar = mean(df$difference)
+s_d = sd(df$difference)
+t0 = dbar/(s_d/sqrt(n))
+c(n, dbar, s_d, t0) |>
+  round(2)
+alpha = 0.05
+qt(1-alpha/2, n - 1)
+```
+
+```{r}
+(s_d = sd(df$difference))
+n=nrow(df); mu0=0
+(crit_val=qt(0.975,n-1))
+rrlower=mu0-crit_val*s_d/sqrt(n)
+rrupper=mu0+crit_val*s_d/sqrt(n)
+c(rrlower,rrupper) |> round(2)
+```

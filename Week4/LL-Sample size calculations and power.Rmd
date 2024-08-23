@@ -1,0 +1,95 @@
+---
+title: "Live lecture: Sample size calculations and power"
+output: html_document
+date: "2024-08-22"
+---
+
+# Beer example: power calculations
+
+
+```{r}
+x = c(374.8, 375.0, 375.3, 374.8, 374.4, 374.9)
+sig = sd(x)  
+xbar = mean(x)
+c(xbar, sig)
+```
+
+Critical value. Very large value. 
+```{r}
+crit_val = qt(1 - (1e-6) / 2, df = 5)
+crit_val
+```
+
+
+What happens when thee sample size changes?
+- Power goes up
+
+## Do it in R
+
+```{r}
+library(pwr)
+# pwr.t.t() : t-tests (one sample, 2 sample, paired)
+res = pwr.t.test(n = 6, d = NULL, sig.level = 0.05, power = 0.8, 
+                 type = "one.sample", alternative = "two.sided")
+res
+```
+
+```{r}
+res$d * 0.294 # d * sigma gives the difference between means
+```
+
+We would rould n = 42.1 ≈ 43 to have at least 80%
+```{r}
+res = pwr.t.test(n = NULL,
+                 d = (374.87-375)/0.294, 
+                 sig.level = 0.05,
+                 power = 0.8, # what we are trying to achieve
+                 type = "one.sample", 
+                 alternative = "two.sided")
+res
+```
+
+# Check your understanding
+
+Meat and Livestock Australia have commissioned your services to help with the design of an experiment to test whether using hormone growth promotant (HGP) drugs in cattle noticeably decreases the eating quality of grilled steaks.
+
+Eating quality is assessed by untrained consumers in a sensory panel where they rate the product on a scale from 0 to 100.
+
+Over the past 20 years of experimentation, we have developed a good understanding of the inherent variation in these consumer eating quality measurements. You can assume that the standard deviation is known to be 10.
+
+Prior work in this field suggests that the use of HGP in cattle could reduce eating quality by 9 points.
+
+Level of significance = 0.01.
+
+### Solve
+
+What is the minimum sample size required for each group to achieve a power of at least 0.8 in a two-sample t-test where 
+the animals in one group received the HGP treatment and 
+the animals in the other group were HGP free?
+
+$$d=\frac{|\mu_1 - \mu_2|}{\sigma}$$
+$$d = |9|/10$$
+
+
+```{r}
+sd = 10
+
+pwr.t.test(d = -9/10,  # we make it a negative difference since we are using "less"
+           sig.level = 0.01, 
+           power = 0.8, 
+           type = "two.sample",  # use ?pwr.t.test 
+           alternative = "less") # e.i. text says "less"
+```
+The functions returns n = 26.2 ≈ 27, since we want "at least". 
+
+
+
+```{r}
+
+```
+
+
+
+
+
+
