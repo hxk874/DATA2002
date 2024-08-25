@@ -1,0 +1,165 @@
+---
+title: "Adapted from Lab 1A Smoking"
+date: "2024-08-23"
+author: "Ellen Ebdrup"
+output: 
+  html_document: 
+    ### IMPORTANT ###
+    # self_contained: true # Creates a single HTML file as output
+    code_folding: show # Code folding; allows you to show/hide code chunks
+    ### USEFUL ###
+    code_download: true # Includes a menu to download the code file
+    ### OPTIONAL ###
+    df_print: paged # Sets how dataframes are automatically printed
+    theme: readable # Controls the font, colours, etc.
+    toc: true # (Useful) Creates a table of contents!
+    toc_float: true # table of contents at the side
+    number_sections: false # (Optional) Puts numbers next to heading/subheadings
+---
+
+## Description
+A study of patients with insulin-dependent diabetes was conducted to investigate the effects of cigarette smoking on renal and retinal complications. Before examining the results of the study, a researcher expects that the proportions of four different subgroups are as follow:
+
+```{r}
+subgroup = c("Nonsmokers", "Current Smokers", "Tobacco Chewers", "Ex-smokers")
+E_prop = c(0.5,0.2,0.1,0.2)
+```
+
+Of 100 randomly selected patients, there are 44 nonsmokers, 24 current smokers, 13 tobacco chewers and 19 ex-smokers. 
+
+## Should the researcher revise his estimates? 
+Use 0.01 level of significance.
+
+```{r}
+n = 100 
+exp = E_prop * n
+obs = c(44,24,13,19)
+```
+
+test statistic
+```{r}
+sum((obs-exp)^2/exp)
+```
+
+### (a) Which test is most appropriate in this scenario?
+
+The most appropriate test for this scenario is the Chi-Square Goodness of Fit Test. This test is used to determine whether the observed distribution of patients across the subgroups (nonsmokers, current smokers, tobacco chewers, and ex-smokers) matches the expected proportions based on the researcher's hypothesis.
+
+```{r}
+chisq.test(obs, p = exp, rescale.p = TRUE, correct = FALSE)
+```
+### (b) Write down the appropriate null and alternative hypotheses.
+
+$H_0$ : The population proportions match the expected proportions (0.50, 0.20, 0.10, 0.20).  
+$H_1$ : The population proportions do not match the expected proportions (at least one differs).
+
+
+### (c) What are the assumptions required for this test. Are they satisfied here?
+
+- The data is from a simple random sample.  
+The problem implies that the data is randomly selected, so the first assumption is likely satisfied.
+
+- The expected frequencies for each category are sufficiently large (usually at least 5).  
+Holds.
+```{r}
+exp > 5
+```
+
+- The observations are independent.  
+Independence is assumed based on the problem context.
+
+### (d) What is the approximate distribution of the test statistic under the null hypothesis?
+
+Under $H_0$, the test statistic follows a Chi-Square distribution with 3 degrees of freedom. 
+
+
+### (e) Write down an expression for the p-value.
+
+$$\text{p-value} = P(\chi^2 \geq 2.47 \mid df = 3)=0.4807$$
+
+### (f) What is your decision for the test and why?
+
+Decision:  
+Since the p-value (0.4807) is much larger than the significance level of 0.01, we fail to reject the null hypothesis.
+
+Reasoning:  
+A p-value of 0.4807 indicates that the observed differences between the observed and expected proportions are not statistically significant at the 0.01 level. Therefore, there is insufficient evidence to conclude that the proportions of the different subgroups in the population differ from the researcher's expectations.
+
+
+
+```{r}
+qchisq(0.005, 1:6, lower.tail = FALSE)
+
+qchisq(0.01, 1:6, lower.tail = FALSE)
+
+qchisq(0.025, 1:6, lower.tail = FALSE)
+
+qchisq(0.05, 1:6, lower.tail = FALSE)
+```
+
+```{r}
+# Load ggplot2 for plotting
+library(ggplot2)
+qchisq(0.01, 1:6, lower.tail = FALSE)
+
+# Create a data frame for the plotting
+x_values <- seq(0, 20, length.out = 500)
+df_values <- 1:6
+plot_data <- data.frame()
+
+# Generate the density values for each degree of freedom
+for (df in df_values) {
+  density_values <- dchisq(x_values, df)
+  plot_data <- rbind(plot_data, data.frame(x = x_values, density = density_values, df = as.factor(df)))
+}
+
+# Plot the PDFs using ggplot2
+ggplot(plot_data, aes(x = x, y = density, color = df)) +
+  geom_line(size = 1) +
+  labs(title = "Chi-Square Distributions for different Degrees of Freedom",
+       x = "Chi-Square Value",
+       y = "Density",
+       color = "Degrees of Freedom") +
+  theme_minimal() +
+  ylim(0, 0.6)
+```
+
+
+### Some graphs and understanding og qchisq().
+
+```{r}
+# Load ggplot2 for plotting
+library(ggplot2)
+
+# Degrees of freedom
+df <- 3
+
+# Compute critical values for 1% in both tails
+upper_critical_value <- qchisq(0.01, df, lower.tail = FALSE)
+lower_critical_value <- qchisq(0.01, df, lower.tail = TRUE)
+
+# Create data for the Chi-Square distribution
+x_values <- seq(0, 20, length.out = 1000)
+density_values <- dchisq(x_values, df)
+
+# Create a data frame for plotting
+plot_data <- data.frame(x = x_values, density = density_values)
+
+# Plot the Chi-Square distribution
+ggplot(plot_data, aes(x = x, y = density)) +
+  geom_line(size = 1, color = "blue") +
+  geom_area(data = subset(plot_data, x >= upper_critical_value), 
+            aes(y = density), fill = "red", alpha = 0.5) +
+  geom_area(data = subset(plot_data, x <= lower_critical_value), 
+            aes(y = density), fill = "green", alpha = 0.5) +
+  geom_vline(xintercept = upper_critical_value, color = "red", linetype = "dashed") +
+  geom_vline(xintercept = lower_critical_value, color = "green", linetype = "dashed") +
+  labs(title = "Chi-Square Distribution (df = 3) with 1% Critical Values",
+       x = "Chi-Square Value",
+       y = "Density") +
+  theme_minimal() +
+  annotate("text", x = upper_critical_value + 1, y = 0.02, label = "Upper 1%", color = "red") +
+  annotate("text", x = lower_critical_value - 1, y = 0.02, label = "Lower 1%", color = "green")
+
+```
+

@@ -1,0 +1,109 @@
+---
+title: "Adapted from Lab 1B Mammograms"
+date: "2024-08-23"
+author: "Ellen Ebdrup"
+output: 
+  html_document: 
+    ### IMPORTANT ###
+    # self_contained: true # Creates a single HTML file as output
+    code_folding: show # Code folding; allows you to show/hide code chunks
+    ### USEFUL ###
+    code_download: true # Includes a menu to download the code file
+    ### OPTIONAL ###
+    df_print: paged # Sets how dataframes are automatically printed
+    theme: readable # Controls the font, colours, etc.
+    toc: true # (Useful) Creates a table of contents!
+    toc_float: true # table of contents at the side
+    number_sections: false # (Optional) Puts numbers next to heading/subheadings
+---
+
+## Description
+
+Suppose that among 100,000 women with negative mammograms, 20 will have breast cancer diagnosed within 2 years; and among 100 women with positive mammograms, 10 will have breast cancer diagnosed within 2 years. 
+
+## Clinicians would like to know if there is a relationship between a positive or negative mammogram and developing breast cancer?
+
+```{r}
+x = matrix(c(10, 20, 90, 99980), ncol = 2)
+colnames(x) = c("Breast cancer: yes", "Breast cancer: no")
+rownames(x) = c("Mammogram: positive", "Mammogram: negative")
+x
+```
+
+
+### (a) Is this a retrospective or a prospective study?
+
+We classify the women based on them having the risk factor $\Rightarrow$ Prospective studies
+
+### (b) Is it appropriate to use a relative risk to quantify the relationship between the risk factor (mammogram result) and disease (breast cancer)?  
+If so calculate the relative risk.
+
+$$RR = \frac{a(c+d)}{c(a+b)}$$
+Using the code below, we have to take 1/result, since mosaic thinks the row order is reverse such that $R^-$ is first. 
+Either you reverse the roworder or take the 1/x. 
+```{r}
+1/mosaic::relrisk(x)
+# same as
+RR = (10*(20+99980))/(20*(10+90))
+```
+
+$RR > 1$ : breast cancer is more likely to occur in the positive mammogram group.
+
+Given the risk factor is NOT present, the probability of having the disease is very small. The nominator is very large:  
+$P(D^+ | R^+)$ is 500 times as large as $P(D^+ | R^-)$
+
+
+### (c) Calculate the odds of having breast cancer for positive vs negative mammograms.
+
+Same as for the RR, take the 1/result since we haven't reversed the row order for the risk factor. 
+
+```{r}
+1/mosaic::oddsRatio(x)
+# same as
+y = x[c(2,1), ] # change row order
+mosaic::oddsRatio(y, verbose = TRUE)
+# same as
+OR = (10*99980)/(90*20)
+```
+
+$OR > 1$ : increased risk of disease  
+
+Conclusion: There is a relation between the mammogram and breast cancer diagnosis.
+
+The estimated odds of having breast cancer for patients with positive mammograms is 555 times the estimated odds for those with negative mammograms. 
+
+
+### (d) Calculate the standard error for the log odds-ratio.
+
+```{r}
+log_OR = log(OR)
+log_OR
+se_log_OR = sqrt(1/10 + 1/20 + 1/90 + 1/99980) # marginal error (standard deviation)
+```
+
+
+### (e) Calculate a 95% confidence interval for the odds-ratio.
+
+$$\log OR ± 1.96 \cdot SE(\log OR)$$
+If $OR$ is inside of the interval: Don't reject $H_0$ and the results are significant.
+
+```{r}
+q_ = qnorm(0.975) # 1.96
+
+# one method:
+log_ci = c(log(or) - q_ * se, log(or) + q_ * se) # [lower, upper]
+log_ci
+
+# another method:
+lower_log_ci <- log_OR - q_ * se_log_OR
+upper_log_ci <- log_OR + q_ * se_log_OR
+
+c(exp(lower_log_ci), exp(upper_log_ci))
+```
+
+$$CI = 6.32 ± 1.96 \cdot 0.40 = [252.9 , 1219.9]$$
+
+
+### (f) Is there evidence that there might be a relationship between mammogram test results and breast cancer diagnosis?
+
+Conclusion: $OR=555 \in CI \Rightarrow$ There is a relation between the mammogram and breast cancer diagnosis.

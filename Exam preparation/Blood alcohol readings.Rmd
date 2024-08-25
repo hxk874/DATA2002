@@ -1,0 +1,67 @@
+---
+title:  "Adapted from Lab 2A Blood alcohol readings" 
+date:   "2024-08-25" 
+author: "Ellen Ebdrup" 
+output: 
+  html_document: 
+    ### IMPORTANT ###
+    # self_contained: true # Creates a single HTML file as output
+    code_folding: show # Code folding; allows you to show/hide code chunks
+    ### USEFUL ###
+    code_download: true # Includes a menu to download the code file
+    ### OPTIONAL ###
+    df_print: paged # Sets how dataframes are automatically printed
+    theme: readable # Controls the font, colours, etc.
+    toc: true # (Useful) Creates a table of contents!
+    toc_float: true # table of contents at the side
+    number_sections: false # (Optional) Puts numbers next to heading/subheadings
+---
+
+## Description
+
+The following are 30 blood alcohol determinations made by Analyzer GTE-10, a three-year-old unit that may be in need of re-calibration. All 30 measurements were made using a test sample on which a properly adjusted machine would give a reading of 12.6%.
+
+
+```{r}
+bac = c(12.3,12.7,12.6,13.1,13.2,12.8,13.1,12.9,13.1,12.4,13.6,12.7,12.6,13.1,12.4, + 12.6,13.3,12.6,12.4,13.1,12.9,12.6,12.7,12.5,12.4,12.4,12.6,12.7,12.4,12.9)
+
+```
+
+
+
+```{r}
+library(tidyverse)
+bac_df = data.frame(bac)
+p1 = ggplot(bac_df, aes(y = bac)) + geom_boxplot() + theme_bw()
+p2 = ggplot(bac_df, aes(sample = bac)) + geom_qq() + geom_qq_line() + theme_bw()
+gridExtra::grid.arrange(p1,p2, ncol = 2)
+```
+
+
+```{r}
+n = length(bac)
+xbar = mean(bac)
+s = sd(bac)
+c(n, xbar, s)
+```
+
+
+### (a) Write out the hypothesis for the Analyzer GTE-10 being faulty.
+
+
+
+### (b) What are the assumptions of this test? Are they satisfied?
+
+
+
+### (c) Assuming that the assumptions are satisfied (regardless of what you found above), write down the test statistic and its distribution assuming that the null hypothesis is true.
+
+
+
+### (d) Calculate the observed test statistic.
+
+
+
+### (e) At the level of significance α = 0.05, what is your conclusion?
+
+

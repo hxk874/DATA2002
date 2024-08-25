@@ -85,7 +85,7 @@ $$RR = \frac{a(c+d)}{c(a+b)}$$
 
 RR > 1 : breast cancer is more likely to occur in the positive mammogram group.
 
-Given the risk factor is NOT present, the probability of having the disease is very small. The nominator is very larg:
+Given the risk factor is NOT present, the probability of having the disease is very small. The nominator is very large:
 $P(D^+ | R^+)$ is 500 times as large as $P(D^+ | R^-)$
 
 
@@ -109,7 +109,7 @@ se = sqrt(1/10 + 1/20 + 1/90 + 1/99980) # marginal error (standard deviation)
 or = (10*99980)/(20*90)
 
 # generate the 95% confidence interval 
-log_ci = c(log(or) - qnorm(0.975) * se, log(or) - qnorm(0.975) * se)
+log_ci = c(log(or) - qnorm(0.975) * se, log(or) + qnorm(0.975) * se)
 ci = exp(log_ci)
 ci
 ```

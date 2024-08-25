@@ -1,0 +1,104 @@
+---
+title:  "Adapted from Lab 1C TV violence" 
+date:   "2024-08-25" 
+author: "Ellen Ebdrup" 
+output: 
+  html_document: 
+    ### IMPORTANT ###
+    # self_contained: true # Creates a single HTML file as output
+    code_folding: show # Code folding; allows you to show/hide code chunks
+    ### USEFUL ###
+    code_download: true # Includes a menu to download the code file
+    ### OPTIONAL ###
+    df_print: paged # Sets how dataframes are automatically printed
+    theme: readable # Controls the font, colours, etc.
+    toc: true # (Useful) Creates a table of contents!
+    toc_float: true # table of contents at the side
+    number_sections: false # (Optional) Puts numbers next to heading/subheadings
+---
+
+## Description
+
+A study of the amount of violence viewed on television as it relates to the age of the viewer yields the results shown in the accompanying table for 81 people.
+
+```{r}
+x = matrix(c(8, 18, 12, 15, 21, 7), ncol = 3)
+colnames(x) = c("16-34", "35-54", "55+")
+rownames(x) = c("Low violence", "High violence")
+x
+```
+
+```{r}
+n = sum(x) # => Check!
+
+(xr = apply(x, 1, sum)) # sum(row)
+
+(xc = apply(x, 2, sum)) # sum(col)
+
+# calculate expected values
+(ex = xr %*% t(xc) / n) # t(x) => transpose of x
+
+# calculate test statistic
+(t0 = sum((x - ex)^2 / ex)) 
+```
+
+### (a) Which test is most appropriate in this scenario?
+
+This scenario involves categorical data with two variables: 
+  age group and 
+  the amount of violence viewed. 
+  
+A Chi-squared test of independence is the most appropriate test to determine whether there is an association between the age group and the amount of violence viewed.
+
+
+### (b) Write down the appropriate null and alternative hypotheses.
+
+$H_0$ : There is no association between the age group and the amount of violence viewed (they are independent).
+
+$H_1$ : There is an association between the age group and the amount of violence viewed (they are not independent).
+
+### (c) What are the assumptions required for this test. Are they satisfied here?
+
+The assumptions for a Chi-squared test of independence are:  
+1. The data should be in the form of counts or frequencies.  
+2. The categories should be mutually exclusive.  
+3. The expected frequency in each cell should be at least 5.  
+
+To check the assumptions, we will calculate the expected frequencies in each cell and see if they are all greater than or equal to 5.
+
+```{r}
+x > 5 # => Check!
+```
+
+
+### (d) What is the approximate distribution of the test statistic under the null hypothesis?
+
+
+The test statistic for the Chi-squared test follows a Chi-squared distribution with degrees of freedom given by:
+$$df=(n_{row}−1) × (n_{col}−1) = 1 \times 2 = 2$$
+
+
+```{r}
+(res = chisq.test(x))
+
+# another way to find the expected values
+res$expected
+
+# test statistic
+t0 = res$statistic
+df = res$parameter
+```
+
+### (e) Write down an expression for the p-value.
+
+$$P(\chi_{2}^2 \geq 11.169) = 0.00376$$
+```{r}
+res$p.value
+```
+
+
+### (f) What is your decision for the test and why?
+
+Let the significance level, $\alpha = 0.05$.
+
+Since the p-value is much smaller than $\alpha = 0.05 > 0.0038$, we reject the null hypothesis and conclude that there is an association between age group and the amount of violence viewed.
