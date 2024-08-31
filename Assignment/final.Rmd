@@ -1,0 +1,111 @@
+---
+title: "Your title here"
+date: "`r Sys.Date()`"
+author: "Your SID (don't put your name, so that we can respect the anonymous marking policy)"
+output: 
+  html_document: 
+    self_contained: true # Creates a single HTML file as output
+    code_folding: hide # Code folding; allows you to show/hide code chunks
+    code_download: true # Includes a menu to download the code file
+    toc: true # (Optional) Creates a table of contents!
+    toc_float: true # table of contents at the side
+    number_sections: true # (Optional) Puts numbers next to heading/subheadings
+
+table-of-contents: true # (Optional) Creates a table of contents!
+number-sections: true # (Optional) Puts numbers next to heading/subheadings
+    
+bibliography: [refs/bibliography.bibtex, refs/Packages.bib]
+
+---
+
+
+
+```{r setup, message = FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(ggplot2)
+#library(patchwork)
+#library(ggpubr)
+# creates a file with the bibtex for packages used:
+knitr::write_bib(c(.packages(),
+                   "knitr", "rmarkdown"), "refs/packages.bib")
+# extra bibliography for manually added references bibliography.bibtex
+
+```
+
+# Introduction
+
+As for the initial data processing, the provided guide from (Tarr, G. (2024)) is used. 
+
+
+<The following questions have to be answered in the introduction>
+
+1. Is this a random sample of DATA2X02 students?
+
+2. What are the potential biases? Which variables are most likely to be subjected to this bias?
+
+3. Which questions needed improvement to generate useful data (e.g. in terms of the way the question was phrased or response validation)?
+
+
+## Initial data processeing 
+
+The first thing to note is that the column names, while very descriptive are terrible for programming with. Let's fix that. We can store a copy of the column names in the vector `old_names`:
+
+```{r}
+old_names = colnames(x) 
+```
+
+
+Now create a new vector that matches the order, but has much sorter names:
+
+
+```{r}
+new_names = c( "timestamp", "target_grade", "assignment_preference", "trimester_or_semester", "age", "tendency_yes_or_no", "pay_rent", "urinal_choice", "stall_choice", "weetbix_count", "weekly_food_spend", "living_arrangements", "weekly_alcohol", "believe_in_aliens", "height", "commute", "daily_anxiety_frequency", "weekly_study_hours", "work_status", "social_media", "gender", "average_daily_sleep", "usual_bedtime", "sleep_schedule", "sibling_count", "allergy_count", "diet_style", "random_number", "favourite_number", "favourite_letter", "drivers_license", "relationship_status", "daily_short_video_time", "computer_os", "steak_preference", "dominant_hand", "enrolled_unit", "weekly_exercise_hours", "weekly_paid_work_hours", "assignments_on_time", "used_r_before", "team_role_type", "university_year", "favourite_anime", "fluent_languages", "readable_languages", "country_of_birth", "wam", "shoe_size") 
+# overwrite the old names with the new names: 
+colnames(x) = new_names 
+# combine old and new into a data frame: 
+name_combo = bind_cols(New = new_names, Old = old_names) 
+name_combo |> gt::gt()
+```
+
+The first thing to note is that the column names, while very descriptive are terrible for programming with. Let's fix that. We can store a copy of the column names in the vector `old_names`:
+
+```{r}
+old_names = colnames(x) 
+```
+
+
+Now create a new vector that matches the order, but has much sorter names:
+
+```{r} new_names = c( "timestamp", "target_grade", "assignment_preference", "trimester_or_semester", "age", "tendency_yes_or_no", "pay_rent", "urinal_choice", "stall_choice", "weetbix_count", "weekly_food_spend", "living_arrangements", "weekly_alcohol", "believe_in_aliens", "height", "commute", "daily_anxiety_frequency", "weekly_study_hours", "work_status", "social_media", "gender", "average_daily_sleep", "usual_bedtime", "sleep_schedule", "sibling_count", "allergy_count", "diet_style", "random_number", "favourite_number", "favourite_letter", "drivers_license", "relationship_status", "daily_short_video_time", "computer_os", "steak_preference", "dominant_hand", "enrolled_unit", "weekly_exercise_hours", "weekly_paid_work_hours", "assignments_on_time", "used_r_before", "team_role_type", "university_year", "favourite_anime", "fluent_languages", "readable_languages", "country_of_birth", "wam", "shoe_size") # overwrite the old names with the new names: colnames(x) = new_names # combine old and new into a data frame: name_combo = bind_cols(New = new_names, Old = old_names) name_combo |> gt::gt() ```
+
+
+
+
+
+
+# Data processeing
+
+
+# Result
+
+Identify 3 questions you can answer from the data and perform a hypothesis test for each question. The hypotheses should be of the same form as what we have covered in lectures. Give a motivation for why you selected these questions. 
+Be sure to report the hypothesis testing workflow, interpret the results and mention any limitations in the data that may impact your findings. You may have mentioned this in general terms in the introduction, but be specific in the results section.
+
+There needs to be some variety in the types of tests you implement:
+
+- at least one test from module 1  
+- at least one test from module 2  
+- at least one test needs to be based on a resampling method (e.g. Monte Carlo or permutation test).
+
+# Discussion
+
+
+# Conclusion
+
+
+# References
+
+<div id="refs"></div>
+
+

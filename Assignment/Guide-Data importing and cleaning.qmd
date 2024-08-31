@@ -22,16 +22,11 @@ citation:
 
 \## Importing the data
 
-The data can be found as an Excel file at this \[link\](https://docs.google.com/spreadsheets/d/1CR33C_oUu2QqbKWshnk5pP\_-wwRIx8z9RCtWN7cVVWw/pub?output=xlsx) \[\@data2002survey\].
-It's best to download it from that page and save it locally to your computer rather than have R fetch it from the internet every time you render your document.
+The data can be found as an Excel file at this \[link\](https://docs.google.com/spreadsheets/d/1CR33C_oUu2QqbKWshnk5pP\_-wwRIx8z9RCtWN7cVVWw/pub?output=xlsx) \[\@data2002survey\]. It's best to download it from that page and save it locally to your computer rather than have R fetch it from the internet every time you render your document.
 
-On my computer, I have a RStudio project and I put the data file in a folder called \`data\` so I read in the data using \`data/DATA2x02_survey_2024_Responses.xlsx\`.
-If you put the data in the same folder as your \`qmd/rmd\` file you don't need the \`data\` part of the file path.
+On my computer, I have a RStudio project and I put the data file in a folder called \`data\` so I read in the data using \`data/DATA2x02_survey_2024_Responses.xlsx\`. If you put the data in the same folder as your \`qmd/rmd\` file you don't need the \`data\` part of the file path.
 
-In this guide, the data was analysed using R version 4.4.1 \[\@R\].
-In particular, the \*\*tidyverse\*\* suite of packages, including \*\*readr\*\*, \*\*tidyr\*\*, \*\*dplyr\*\* and \*\*ggplot2\*\* \[\@tidyverse\].
-The \*\*janitor\*\* package was used for data cleaning and cross tabulations \[\@janitor\] and the \*\*gt\*\* package was used to present the tables \[\@gt\].
-The document was compiled using the Quarto publishing system \[\@quarto\].
+In this guide, the data was analysed using R version 4.4.1 \[\@R\]. In particular, the \*\*tidyverse\*\* suite of packages, including \*\*readr\*\*, \*\*tidyr\*\*, \*\*dplyr\*\* and \*\*ggplot2\*\* \[\@tidyverse\]. The \*\*janitor\*\* package was used for data cleaning and cross tabulations \[\@janitor\] and the \*\*gt\*\* package was used to present the tables \[\@gt\]. The document was compiled using the Quarto publishing system \[\@quarto\].
 
 ::: {.callout-note collapse="true"}
 #### How to view the code for this guide?
@@ -41,163 +36,50 @@ You can get the code for this whole report by clicking the Code button at the to
 You'll see the YAML references a bibliography file \`report.bib\` which can be downloaded \[here\](report.bib). It's a \[bibtex file\](https://en.wikipedia.org/wiki/BibTeX) which is a plain text way to store reference information. You can find get bibtex info for a R package using \`citation("PACKAGENAME")\` or you can usually download it from the library or publisher's website for books and journal articles. If you want to use it, put it in the same folder as your \`.qmd\` or \`.rmd\` file.
 :::
 
-\`\`\`{r}
-#\| message: false
-library(tidyverse)
-library(gendercoder)
-library(janitor)
-library(hms)
-theme_set(theme_bw())
-x = readxl::read_excel("data/DATA2x02_survey_2024_Responses.xlsx")
-\`\`\`
+```{r}
+#| message: false library(tidyverse) library(gendercoder) library(janitor) library(hms) theme_set(theme_bw()) x = readxl::read_excel("data/DATA2x02_survey_2024_Responses.xlsx") 
 
-The first thing to note is that the column names, while very descriptive are terrible for programming with.
-Let's fix that.
-We can store a copy of the column names in the vector \`old_names\`:
+```
 
-\`\`\`{r}
-old_names = colnames(x)
-\`\`\`
+The first thing to note is that the column names, while very descriptive are terrible for programming with. Let's fix that. We can store a copy of the column names in the vector \`old_names\`:
+
+\`\`\`{r} old_names = colnames(x) \`\`\`
 
 Now create a new vector that matches the order, but has much sorter names:
 
-\`\`\`{r}
-new_names = c(
-"timestamp",
-"target_grade",
-"assignment_preference",
-"trimester_or_semester",
-"age",
-"tendency_yes_or_no",
-"pay_rent",
-"urinal_choice",
-"stall_choice",
-"weetbix_count",
-"weekly_food_spend",
-"living_arrangements",
-"weekly_alcohol",
-"believe_in_aliens",
-"height",
-"commute",
-"daily_anxiety_frequency",
-"weekly_study_hours",
-"work_status",
-"social_media",
-"gender",
-"average_daily_sleep",
-"usual_bedtime",
-"sleep_schedule",
-"sibling_count",
-"allergy_count",
-"diet_style",
-"random_number",
-"favourite_number",
-"favourite_letter",
-"drivers_license",
-"relationship_status",
-"daily_short_video_time",
-"computer_os",
-"steak_preference",
-"dominant_hand",
-"enrolled_unit",
-"weekly_exercise_hours",
-"weekly_paid_work_hours",
-"assignments_on_time",
-"used_r_before",
-"team_role_type",
-"university_year",
-"favourite_anime",
-"fluent_languages",
-"readable_languages",
-"country_of_birth",
-"wam",
-"shoe_size")
-# overwrite the old names with the new names:
-colnames(x) = new_names
-# combine old and new into a data frame:
-name_combo = bind_cols(New = new_names, Old = old_names)
-name_combo \|\> gt::gt()
-\`\`\`
+\`\`\`{r} new_names = c( "timestamp", "target_grade", "assignment_preference", "trimester_or_semester", "age", "tendency_yes_or_no", "pay_rent", "urinal_choice", "stall_choice", "weetbix_count", "weekly_food_spend", "living_arrangements", "weekly_alcohol", "believe_in_aliens", "height", "commute", "daily_anxiety_frequency", "weekly_study_hours", "work_status", "social_media", "gender", "average_daily_sleep", "usual_bedtime", "sleep_schedule", "sibling_count", "allergy_count", "diet_style", "random_number", "favourite_number", "favourite_letter", "drivers_license", "relationship_status", "daily_short_video_time", "computer_os", "steak_preference", "dominant_hand", "enrolled_unit", "weekly_exercise_hours", "weekly_paid_work_hours", "assignments_on_time", "used_r_before", "team_role_type", "university_year", "favourite_anime", "fluent_languages", "readable_languages", "country_of_birth", "wam", "shoe_size") \# overwrite the old names with the new names: colnames(x) = new_names \# combine old and new into a data frame: name_combo = bind_cols(New = new_names, Old = old_names) name_combo \|\> gt::gt() \`\`\`
 
 You don't \*\*have\*\* to use these suggested shorter names, but it will likely help.
 
-You'll probably want to check out the missingness in the data. There's a handy function in the \*\*visdat\*\* package for that \[\@visdat\].
-From \@fig-missing_data it seems there are some variables that are much more likely to be skipped than other variables, for example WAM.
+You'll probably want to check out the missingness in the data. There's a handy function in the \*\*visdat\*\* package for that \[\@visdat\]. From \@fig-missing_data it seems there are some variables that are much more likely to be skipped than other variables, for example WAM.
 
-\`\`\`{r}
-#\| label: fig-missing_data
-#\| fig-cap: "Visualising the missingness in the raw data. The dark cells indicate missing values."
-#\| fig-height: 5
-visdat::vis_miss(x) +
-theme(axis.text.x = element_text(angle = 90, hjust = 0))
-\`\`\`
+\`\`\`{r} #\| label: fig-missing_data #\| fig-cap: "Visualising the missingness in the raw data. The dark cells indicate missing values." #\| fig-height: 5 visdat::vis_miss(x) + theme(axis.text.x = element_text(angle = 90, hjust = 0)) \`\`\`
 
 ## Cleaning the data
 
-I'll give some tips and tricks for cleaning some of the variables.
-You should be able to carry these over to other variables that may need some attention before they're useful for analysis.
+I'll give some tips and tricks for cleaning some of the variables. You should be able to carry these over to other variables that may need some attention before they're useful for analysis.
 
 ### Height
 
-What's wrong with the \`height\` variable?
-Here are the values that were recorded:
+What's wrong with the \`height\` variable? Here are the values that were recorded:
 
-\`\`\`{r, results = "markdown"}
-unique(sort(x\$height))
-\`\`\`
+\`\`\`{r, results = "markdown"} unique(sort(x\$height)) \`\`\`
 
-For many of them it would be OK if we could just extract the numeric component (\`readr::parse_number()\`), this would give us mostly heights in cm, except those that are in meters, so for any reasonably "small" values (values \<= 2.5) we multiply them by 100 using \`case_when()\` to convert them to centimeters.
-There are a few heights in feet and inches that are a bit more complex (but could be done with some \[regex\](https://stackoverflow.com/questions/55244198/convert-character-vector-of-height-in-inches-to-cm)), after \`readr::parse_number()\` these take values like 5 or 6, so we won't worry about them and just turn them into missing (\`NA\`) values.
+For many of them it would be OK if we could just extract the numeric component (\`readr::parse_number()\`), this would give us mostly heights in cm, except those that are in meters, so for any reasonably "small" values (values \<= 2.5) we multiply them by 100 using \`case_when()\` to convert them to centimeters. There are a few heights in feet and inches that are a bit more complex (but could be done with some \[regex\](https://stackoverflow.com/questions/55244198/convert-character-vector-of-height-in-inches-to-cm)), after \`readr::parse_number()\` these take values like 5 or 6, so we won't worry about them and just turn them into missing (\`NA\`) values.
 
-\`\`\`{r}
-x = x \|\>
-dplyr::mutate(
-height_clean = readr::parse_number(height),
-height_clean = case_when(
-\# convert meters to cm
-height_clean \<= 2.5 \~ height_clean \* 100,
-\# convert the feet and inches to missing
-height_clean \<= 100 \~ NA_real\_,
-TRUE \~ height_clean
-),
-)
-\`\`\`
+\`\`\`{r} x = x \|\> dplyr::mutate( height_clean = readr::parse_number(height), height_clean = case_when( \# convert meters to cm height_clean \<= 2.5 \~ height_clean \* 100, \# convert the feet and inches to missing height_clean \<= 100 \~ NA_real\_, TRUE \~ height_clean ), ) \`\`\`
 
-Always a good idea to check that you're left with something sensible.
-Using a histogram, like in \@fig-height_hist is one way to do this.
+Always a good idea to check that you're left with something sensible. Using a histogram, like in \@fig-height_hist is one way to do this.
 
-\`\`\`{r}
-#\| label: fig-height_hist
-#\| fig-cap: "Historgram of DATA2x02 heights. There are still a few outliers that need to be dealt with."
-x \|\>
-ggplot() +
-aes(x = height_clean) +
-geom_histogram(binwidth = 5)+
-labs(x = "Count", y = "Height (cm)")
-\`\`\`
+\`\`\`{r} #\| label: fig-height_hist #\| fig-cap: "Historgram of DATA2x02 heights. There are still a few outliers that need to be dealt with." x \|\> ggplot() + aes(x = height_clean) + geom_histogram(binwidth = 5)+ labs(x = "Count", y = "Height (cm)") \`\`\`
 
-There are two outliers. It's worth taking a look at this observation.
-Can do this interactively in the RStudio interface using:
+There are two outliers. It's worth taking a look at this observation. Can do this interactively in the RStudio interface using:
 
-\`\`\`{r, eval = FALSE}
-x \|\> select(height, height_clean) \|\> View()
-\`\`\`
+\`\`\`{r, eval = FALSE} x \|\> select(height, height_clean) \|\> View() \`\`\`
 
-One of the people specified \`0.000329374 nautical leagues\` as their height and the other specified the number \`1730\`.
-When you're doing your data cleaning you might want to consider whether or not entire rows should be excluded.
-For the purposes of the \`height_clean\` variable, I'd be very comfortable excluding both these cells:
+One of the people specified \`0.000329374 nautical leagues\` as their height and the other specified the number \`1730\`. When you're doing your data cleaning you might want to consider whether or not entire rows should be excluded. For the purposes of the \`height_clean\` variable, I'd be very comfortable excluding both these cells:
 
-\`\`\`{r}
-x = x \|\>
-mutate(height_clean = case_when(
-\# convert remaining to missisng
-height_clean \<= 100 \~ NA_real\_,
-height_clean \>= 250 \~ NA_real\_,
-TRUE \~ height_clean
-))
-# check it's worked:
-# x \|\> select(height, height_clean) \|\> View()
-\`\`\`
+\`\`\`{r} x = x \|\> mutate(height_clean = case_when( \# convert remaining to missisng height_clean \<= 100 \~ NA_real\_, height_clean \>= 250 \~ NA_real\_, TRUE \~ height_clean )) \# check it's worked: \# x \|\> select(height, height_clean) \|\> View() \`\`\`
 
 ### Gender
 
@@ -209,217 +91,69 @@ There's a great package called \[\*\*gendercoder\*\*\](https://github.com/ropens
 
 The \*\*gendercode\*\* package isn't on CRAN, you can install it directly from GitHub using the \`install_github()\` function from the \*\*remotes\*\* package.
 
-\`\`\`{r}
-#\| eval: false
-install.packages("remotes")
-remotes::install_github("ropenscilabs/gendercoder")
-\`\`\`
+\`\`\`{r} #\| eval: false install.packages("remotes") remotes::install_github("ropenscilabs/gendercoder") \`\`\`
 
-When you have it installed, you apply the \`recode_gender()\` function to the column that has your gender data.
-\@tbl-gender_recode shows the original values and the recoded outcomes.
+When you have it installed, you apply the \`recode_gender()\` function to the column that has your gender data. \@tbl-gender_recode shows the original values and the recoded outcomes.
 
-\`\`\`{r}
-#\| label: tbl-gender_recode
-#\| tbl-cap: "Crosstabulation of the original gender entries (left column) and the recoded values after passing through the \`recode_gender()\` function."
-library(gendercoder)
-x = x \|\> mutate(
-gender_clean = gendercoder::recode_gender(gender, dictionary = fewlevels_en)
-)
-x \|\> janitor::tabyl(
-gender, gender_clean
-) \|\> gt::gt() \|\>
-gt::tab_spanner(label = "Recoded outcomes", columns = 2:5) \|\>
-gt::cols_label(gender = "Original outcomes")
-\`\`\`
+\`\`\`{r} #\| label: tbl-gender_recode #\| tbl-cap: "Crosstabulation of the original gender entries (left column) and the recoded values after passing through the \`recode_gender()\` function." library(gendercoder) x = x \|\> mutate( gender_clean = gendercoder::recode_gender(gender, dictionary = fewlevels_en) ) x \|\> janitor::tabyl( gender, gender_clean ) \|\> gt::gt() \|\> gt::tab_spanner(label = "Recoded outcomes", columns = 2:5) \|\> gt::cols_label(gender = "Original outcomes") \`\`\`
 
 You could go further (e.g. pooling boy/man and girl/woman) and tidy up some of the obvious ones that were not in the gendercoder built in dictionary.
 
-In general if you want to use gender as one of your variables, you may need to think carefully about what your question really is and how to subset the data.
-There was a discussion that might help you think about this on \[Twitter\](https://twitter.com/seanpmackinnon/status/1562099920898859008?s=20&t=yy3i7-SRriMXgaaz5jQOXA), I've taken a copy of it as a \[pdf here\](../extra/twitter_gender_thread.pdf).
-
+In general if you want to use gender as one of your variables, you may need to think carefully about what your question really is and how to subset the data. There was a discussion that might help you think about this on \[Twitter\](https://twitter.com/seanpmackinnon/status/1562099920898859008?s=20&t=yy3i7-SRriMXgaaz5jQOXA), I've taken a copy of it as a \[pdf here\](../extra/twitter_gender_thread.pdf).
 
 ### Social media
 
-The social media one is a bit messy, see \@tbl-social_media_dirty.
-We can start by converting everything to lower case, to avoid differences that are only because of capitalisation.
-Next we change all punctuation to spaces, pick out the first word (assuming that their favourite was listed first) and help merge categories using \`case_when()\`.
-I've also assumed that anyone who didn't enter a social media platform doesn't have one (i.e. the missing values become \`"none"\`).
-Finally, I've used the \`forcats::fct_lump_min()\` function which collapses groups smaller than a given threshold into "Other".
-The results can be found in \@tbl-social_media_clean.
+The social media one is a bit messy, see \@tbl-social_media_dirty. We can start by converting everything to lower case, to avoid differences that are only because of capitalisation. Next we change all punctuation to spaces, pick out the first word (assuming that their favourite was listed first) and help merge categories using \`case_when()\`. I've also assumed that anyone who didn't enter a social media platform doesn't have one (i.e. the missing values become \`"none"\`). Finally, I've used the \`forcats::fct_lump_min()\` function which collapses groups smaller than a given threshold into "Other". The results can be found in \@tbl-social_media_clean.
 
-\`\`\`{r}
-#\| label: tbl-social_media_dirty
-#\| tbl-cap: "Summary of favourite social media platforms before data cleaning."
-x \|\> janitor::tabyl(social_media) \|\>
-gt::gt() \|\>
-gt::fmt_percent(columns = 3:4, decimals = 1) \|\>
-gt::cols_label(social_media = "Favourite social media platform")
-\`\`\`
+\`\`\`{r} #\| label: tbl-social_media_dirty #\| tbl-cap: "Summary of favourite social media platforms before data cleaning." x \|\> janitor::tabyl(social_media) \|\> gt::gt() \|\> gt::fmt_percent(columns = 3:4, decimals = 1) \|\> gt::cols_label(social_media = "Favourite social media platform") \`\`\`
 
+\`\`\`{r} x= x \|\> mutate( social_media_clean = tolower(social_media), social_media_clean = str_replace_all(social_media_clean, '\[\[:punct:\]\]',' '), social_media_clean = stringr::word(social_media_clean), social_media_clean = case_when( stringr::str_starts(social_media_clean,"in") \~ "instagram", stringr::str_starts(social_media_clean,"ig") \~ "instagram", stringr::str_starts(social_media_clean,"tik") \~ "tiktok", stringr::str_starts(social_media_clean,"we") \~ "wechat", stringr::str_starts(social_media_clean,"twi") \~ "twitter", stringr::str_starts(social_media_clean,"x") \~ "twitter", stringr::str_starts(social_media_clean,"mess") \~ "facebook", stringr::str_starts(social_media_clean,"bil") \~ "bilibili", is.na(social_media_clean) \~ "none", TRUE \~ social_media_clean ), social_media_clean = tools::toTitleCase(social_media_clean), social_media_clean = forcats::fct_lump_min(social_media_clean, min = 10) ) \`\`\`
 
-\`\`\`{r}
-x= x \|\> mutate(
-social_media_clean = tolower(social_media),
-social_media_clean = str_replace_all(social_media_clean, '\[\[:punct:\]\]',' '),
-social_media_clean = stringr::word(social_media_clean),
-social_media_clean = case_when(
-stringr::str_starts(social_media_clean,"in") \~ "instagram",
-stringr::str_starts(social_media_clean,"ig") \~ "instagram",
-stringr::str_starts(social_media_clean,"tik") \~ "tiktok",
-stringr::str_starts(social_media_clean,"we") \~ "wechat",
-stringr::str_starts(social_media_clean,"twi") \~ "twitter",
-stringr::str_starts(social_media_clean,"x") \~ "twitter",
-stringr::str_starts(social_media_clean,"mess") \~ "facebook",
-stringr::str_starts(social_media_clean,"bil") \~ "bilibili",
-is.na(social_media_clean) \~ "none",
-TRUE \~ social_media_clean
-),
-social_media_clean = tools::toTitleCase(social_media_clean),
-social_media_clean = forcats::fct_lump_min(social_media_clean, min = 10)
-)
-\`\`\`
-
-
-
-\`\`\`{r}
-#\| label: tbl-social_media_clean
-#\| tbl-cap: "Summary of favourite social media platforms after data cleaning."
-x \|\> janitor::tabyl(social_media_clean) \|\>
-arrange(desc(n)) \|\>
-gt::gt() \|\>
-gt::fmt_percent(columns = 3, decimals = 1) \|\>
-gt::cols_label(social_media_clean = "Favourite social media platform") \|\>
-gt::cols_align(align = "left", columns = 1)
-\`\`\`
+\`\`\`{r} #\| label: tbl-social_media_clean #\| tbl-cap: "Summary of favourite social media platforms after data cleaning." x \|\> janitor::tabyl(social_media_clean) \|\> arrange(desc(n)) \|\> gt::gt() \|\> gt::fmt_percent(columns = 3, decimals = 1) \|\> gt::cols_label(social_media_clean = "Favourite social media platform") \|\> gt::cols_align(align = "left", columns = 1) \`\`\`
 
 ### Bedtime
 
 Start by converting the bedtimes to a simpler time format:
 
-\`\`\`{r}
-x = x \|\>
-mutate(bedtime_clean = hms::as_hms(usual_bedtime))
-\`\`\`
+\`\`\`{r} x = x \|\> mutate(bedtime_clean = hms::as_hms(usual_bedtime)) \`\`\`
 
-
-\`\`\`{r}
-#\| fig-cap: "Histogram of usual bedtimes for DATA2x02 students in a polar coordiate style plot."
-#\| label: fig-bedtime_hist
-x \|\> ggplot() +
-aes(x = bedtime_clean) +
-geom_histogram(boundary=0, binwidth = 60\*60,closed = "right") +
-coord_polar()
-\`\`\`
+\`\`\`{r} #\| fig-cap: "Histogram of usual bedtimes for DATA2x02 students in a polar coordiate style plot." #\| label: fig-bedtime_hist x \|\> ggplot() + aes(x = bedtime_clean) + geom_histogram(boundary=0, binwidth = 60\*60,closed = "right") + coord_polar() \`\`\`
 
 From \@fig-bedtime_hist, we see there are some times that are 12 hours out of line with the rest of the data:
 
-\`\`\`{r}
-x \|\>
-filter(bedtime_clean \> hms::as_hms("06:00:00"),
-bedtime_clean \< hms::as_hms("14:00:00")) \|\>
-janitor::tabyl(bedtime_clean) \|\> gt::gt()
-\`\`\`
+\`\`\`{r} x \|\> filter(bedtime_clean \> hms::as_hms("06:00:00"), bedtime_clean \< hms::as_hms("14:00:00")) \|\> janitor::tabyl(bedtime_clean) \|\> gt::gt() \`\`\`
 
 I don't really know what to do with the 6:30 and 7:00 - it's possible someone goes to bed at 6:30pm, but it's also possible that someone goes to bed at 6:30am.
 
 Let's add 12 hours to these times, the end result is visualised in \@fig-bedtime_hist2.
 
-\`\`\`{r}
-x = x \|\>
-mutate(
-bedtime_clean = case_when(
-bedtime_clean \> hms::as_hms("06:00:00") &
-bedtime_clean \< hms::as_hms("14:00:00") \~ bedtime_clean + 12\*60\*60,
-TRUE \~ bedtime_clean
-),
-bedtime_clean = if_else(bedtime_clean\>= hms::as_hms("24:00:00") , bedtime_clean - 24\*60\*60, bedtime_clean)
-)
-# x \|\> select(bedtime_clean, usual_bedtime) \|\> View()
-\`\`\`
+\`\`\`{r} x = x \|\> mutate( bedtime_clean = case_when( bedtime_clean \> hms::as_hms("06:00:00") & bedtime_clean \< hms::as_hms("14:00:00") \~ bedtime_clean + 12\*60\*60, TRUE \~ bedtime_clean ), bedtime_clean = if_else(bedtime_clean\>= hms::as_hms("24:00:00") , bedtime_clean - 24\*60\*60, bedtime_clean) ) \# x \|\> select(bedtime_clean, usual_bedtime) \|\> View() \`\`\`
 
-\`\`\`{r}
-#\| fig-cap: "Histogram of cleaned bedtimes for DATA2x02 students in a polar coordiate style plot."
-#\| label: fig-bedtime_hist2
-x \|\> ggplot() +
-aes(x = bedtime_clean) +
-geom_histogram(boundary=0, binwidth = 60\*60,closed = "right") +
-coord_polar()
-\`\`\`
-
-
-
+\`\`\`{r} #\| fig-cap: "Histogram of cleaned bedtimes for DATA2x02 students in a polar coordiate style plot." #\| label: fig-bedtime_hist2 x \|\> ggplot() + aes(x = bedtime_clean) + geom_histogram(boundary=0, binwidth = 60\*60,closed = "right") + coord_polar() \`\`\`
 
 ### Commute
 
-
-\`\`\`{r}
-x = x \|\>
-mutate(identifier = row_number()) \|\>
-mutate(commute = replace_na(commute, "Non-response"))
-\`\`\`
+\`\`\`{r} x = x \|\> mutate(identifier = row_number()) \|\> mutate(commute = replace_na(commute, "Non-response")) \`\`\`
 
 We can use the \`separate_rows()\` function to generate one row per selection, but this duplicates all our other data - importantly it means that the rows of the data frame are no longer independent (people who selected multiple sports will be in there multiple times!)
 
-\`\`\`{r}
-commute \<- x \|\>
-dplyr::select(identifier, commute) \|\>
-tidyr::separate_rows(commute,
-sep = ", ")
-commute \|\> janitor::tabyl(commute) \|\> gt::gt()
+\`\`\`{r} commute \<- x \|\> dplyr::select(identifier, commute) \|\> tidyr::separate_rows(commute, sep = ", ") commute \|\> janitor::tabyl(commute) \|\> gt::gt()
 
-commute = commute \|\>
-dplyr::mutate(
-commute = case_when(
-commute == "Cycle" \~ "Bike",
-commute == "live on campus" \~ "Walk",
-TRUE \~ commute
-),
-commute = factor(commute),
-commute = forcats::fct_lump_min(commute, 10))
-commute \|\> janitor::tabyl(commute) \|\> gt::gt()
-\`\`\`
-We can now do useful things with the data, like plot it, see \@fig-commute_bar_chart.
+commute = commute \|\> dplyr::mutate( commute = case_when( commute == "Cycle" \~ "Bike", commute == "live on campus" \~ "Walk", TRUE \~ commute ), commute = factor(commute), commute = forcats::fct_lump_min(commute, 10)) commute \|\> janitor::tabyl(commute) \|\> gt::gt() \`\`\` We can now do useful things with the data, like plot it, see \@fig-commute_bar_chart.
 
-\`\`\`{r}
-#\| label: fig-commute_bar_chart
-#\| fig-height: 2
-#\| fig-cap: "Bar chart showing the common ways of commuting by DATA2x02 students."
-commute \|\> ggplot() +
-aes(y = reorder(commute, commute, **function**(x) length(x))) +
-geom_bar() +
-labs(y = "", x = "Count")
-\`\`\`
+\`\`\`{r} #\| label: fig-commute_bar_chart #\| fig-height: 2 #\| fig-cap: "Bar chart showing the common ways of commuting by DATA2x02 students." commute \|\> ggplot() + aes(y = reorder(commute, commute, **function**(x) length(x))) + geom_bar() + labs(y = "", x = "Count") \`\`\`
 
-If we wanted to merge this individual commute data back into the original data frame, we could do something like the below where we pivot the commute data frame to be wider with each row identifying a single student and each column corresponds to a method of commuting.
-If a student indicated the commuting method it shows up as a \`1\` in the column, otherwise it's a \`0\`.
+If we wanted to merge this individual commute data back into the original data frame, we could do something like the below where we pivot the commute data frame to be wider with each row identifying a single student and each column corresponds to a method of commuting. If a student indicated the commuting method it shows up as a \`1\` in the column, otherwise it's a \`0\`.
 
-\`\`\`{r}
-commute_wide = commute \|\>
-mutate(value = 1) \|\>
-distinct() \|\>
-pivot_wider(id_cols = identifier,
-names_from = commute,
-values_from = value,
-values_fill = 0)
-glimpse(commute_wide)
-\`\`\`
+\`\`\`{r} commute_wide = commute \|\> mutate(value = 1) \|\> distinct() \|\> pivot_wider(id_cols = identifier, names_from = commute, values_from = value, values_fill = 0) glimpse(commute_wide) \`\`\`
 
 We could then merge this back in to the original data frame using the \`left_join()\` function. Now the \`x\` data frame has a column for each commuting method
 
-\`\`\`{r}
-x = x \|\>
-left_join(commute_wide,
-by = "identifier") \|\>
-janitor::clean_names()
-colnames(x)
-\`\`\`
-
+\`\`\`{r} x = x \|\> left_join(commute_wide, by = "identifier") \|\> janitor::clean_names() colnames(x) \`\`\`
 
 ## Final comments
 
-In your report you should talk (in words) about your data cleaning choices - e.g. what did you consider to be missing, which rows (if any) did you exclude, how did you clean your data (including what was the threshold for lumping into an "Other" category).
-However, you shouldn't show all the output that I've shown above (e.g. before categories and after categories).
-This document is about guiding you through the data cleaning process, it's not an example of what a report should look like.
+In your report you should talk (in words) about your data cleaning choices - e.g. what did you consider to be missing, which rows (if any) did you exclude, how did you clean your data (including what was the threshold for lumping into an "Other" category). However, you shouldn't show all the output that I've shown above (e.g. before categories and after categories). This document is about guiding you through the data cleaning process, it's not an example of what a report should look like.
 
 If you choose to use any of the above variables, you're welcome to make other decisions with your data cleaning process, this is just an example highlighting some useful functions and packages that can make the process easier while still being reproducible - i.e. we did not (and should not) manually edit the raw data file.
 

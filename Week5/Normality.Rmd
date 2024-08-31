@@ -1,0 +1,74 @@
+---
+title: "Checking for normality"
+output: html_document
+date: "2024-08-26"
+---
+
+## Box plots
+
+```{r}
+set.seed(2019)
+n_groups = 20
+n_obs = 100
+dat_100 = data.frame(
+  values = rnorm(n_groups * n_obs),
+  group = rep(letters[1:n_groups], each = n_obs)
+)
+library(ggplot2)
+ggplot(dat_100) + aes(x = group, y = values) + 
+  geom_boxplot(fill = "steelblue") + 
+  labs(x = NULL, caption = "n=100 in each group")
+```
+
+```{r}
+set.seed(2019)
+n_groups = 20
+n_obs = 10
+dat_10 = data.frame(
+  values = rnorm(n_groups * n_obs),
+  group = rep(letters[1:n_groups], each = n_obs)
+)
+library(ggplot2)
+ggplot(dat_10) + aes(x = group, y = values) + 
+  geom_boxplot(fill = "steelblue") + 
+  labs(x = NULL, caption = "n=10 in each group")
+```
+
+## Q-Q plots
+
+```{r}
+dat_100 |> dplyr::filter(group <= "h") |> 
+  ggplot() + 
+  aes(sample = values, group = group) + 
+  geom_qq_line() + geom_qq() + 
+  facet_wrap(~group, nrow = 2)
+```
+
+```{r}
+dat_10 |> dplyr::filter(group <= "h") |> 
+  ggplot() + 
+  aes(sample = values, group = group) + 
+  geom_qq_line() + geom_qq() + 
+  facet_wrap(~group, nrow = 2)
+```
+
+# Raw data: Normality
+
+```{r}
+ggplot(rat) + aes(y = "", x = d) + 
+  geom_boxplot() + 
+  geom_jitter(width = 0.1, 
+              size = 2,
+              colour = "blue") + 
+  labs(y = "", 
+       x = "Difference in muscle weight (g)")
+```
+
+```{r}
+ggplot(rat, aes(sample = d)) + 
+  geom_qq(size = 3) +
+  geom_qq_line() + 
+  labs(x = "Theoretical quantiles",
+       y = "Sample data")
+```
+

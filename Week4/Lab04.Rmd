@@ -197,3 +197,4 @@ We cant use chi test, since expected is < 5 at the rightmost column
 
 
 
+

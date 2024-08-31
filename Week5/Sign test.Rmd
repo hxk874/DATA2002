@@ -1,0 +1,55 @@
+---
+title: 'Sign Test'
+output: html_document
+date: "2024-08-26"
+---
+
+```{r}
+set.seed(123)
+n = 100000
+par(cex = 3, mfrow = c(1,2))
+plot(density(rnorm(n)),
+     main = 'Standard normal', ylab = 'Density', xlab = 'x', col = 3, lwd = 2)
+plot(density(c(rnorm(n, mean = -1.5), rnorm(n, mean = 1.5))),
+     main = 'Bimodal', ylab = 'Density', xlab = 'x', col = 4, lwd = 2)
+```
+
+
+
+# Paint drying times
+
+```{r}
+paint = tibble(new_paint = c(6.4,5.8,7.4,5.5,6.3,7.8,8.6,8.2,7.0,4.9),
+               old_paint = c(6.6,5.9,7.8,5.7,6.0,8.4,8.8,8.4,7.3,5.8),
+               d = old_paint - new_paint)
+paint |> ggplot() + aes(x = d, y = "") + 
+  geom_boxplot(coef = 10, fill = "steelblue") + 
+  geom_dotplot(binaxis = "x", stackdir = "up", dotsize = 0.7) + 
+  labs(x = "Difference in drying time (h)\n(Old - New)", y = "")
+```
+
+## Workflow
+
+Let $p_+$ denote the probability of a positive difference and we will use a 5\% level of significance.
+
+\begin{itemize}
+\item \textbf{Hypothesis:} 
+$H_0: p_+ = \frac{1}{2}$ \textbf{against} $H_1: p_+ > \frac{1}{2}$.
+    
+\item \textbf{Assumptions:} 
+Differences are independent.
+    
+\item \textbf{Test statistic:} 
+Let $T$ denote the number of positive differences. There are 10 non-zero differences. Thus under $H_0$, $T \sim B(10, 0.5)$.
+    
+\item \textbf{Observed test statistic:} 
+We observe $t_0 = 9$ positive differences out of the 10 non-zero differences.
+    
+\item \textbf{p-value:}
+$$P(T \geq t_0) = P(T \geq 9) = 1 - P(T \leq 8) = 1 - \text{pbinom}(8, 10, 0.5) \approx 0.0107$$
+\item \textbf{Conclusion:} As the p-value is less than $\alpha = 0.05$, we reject $H_0$ and conclude that the new additive is effective in reducing the drying time of the paint.
+
+\end{itemize}
+
+
+

@@ -1,0 +1,319 @@
+---
+title: "Wilcoxon rank-sum test"
+format: 
+  html:
+    code-tools: true
+    embed-resources: true
+---
+
+Provided for the live lecture and as example code. 
+
+```{r, message=FALSE}
+library(tidyverse)
+```
+
+## Yield
+
+vector of observed variables
+```{r}
+A = c(32, 29, 35, 28)     # n_A = 4
+B = c(27, 31, 26, 25, 30) # n_B = 5
+# Then N = 9 
+dat = data.frame(
+  yield = c(A, B),
+  method = c(rep("A", length(A)),
+             rep("B", length(B)))
+)
+```
+
+
+Another dataset frmo Quiz \#4
+```{r}
+A = c(1.83, 0.50, 1.62, 2.48, 1.68, 1.88, 1.55, 2.06, 1.30)
+B = c(0.878, 0.647, 0.598, 2.05, 1.06, 1.29, 1.06, 3.14, 1.29)
+dat = data.frame(
+  yield = c(A, B),
+  method = c(rep("A", length(A)),
+             rep("B", length(B)))
+)
+```
+
+
+```{r}
+library(ggplot2)
+ggplot(dat, aes(x = method, y = yield)) + 
+  geom_boxplot() + 
+  geom_point(size = 4, colour = "blue")
+```
+
+
+```{r}
+dat = dat |> mutate(rank = rank(yield))
+dat
+```
+
+```{r}
+w_A = dat |> 
+  filter(method == "A") |> 
+  pull(rank) |> 
+  sum()
+w_A
+```
+
+```{r}
+sum_dat = dat |>
+  group_by(method) |> 
+  summarise(n = n(),
+            w = sum(rank))
+sum_dat
+```
+
+```{r}
+n_A = sum_dat |> 
+  filter(method == "A") |> 
+  pull(n)
+n_B = sum_dat |> 
+  filter(method == "B") |>
+  pull(n)
+# using the sums of the A sample
+w_A = sum_dat |> 
+  filter(method == "A") |> 
+  pull(w)
+ew_A = n_A * (n_A + n_B + 1)/2 
+minw_A = n_A * (n_A + 1)/2 
+
+# check what the expected value is
+ew_A # = 20
+# and 
+minw_A # = 10
+```
+
+### Find the p-value
+Now you want to find the p-value
+
+If lower.tail=TRUE, then you would get w ≤ the observed value 
+
+Interested in: $P(W \geq 26)$
+where 26 is the sum of ranks associated with A
+
+With out -1:
+   # test(26 - 10 , 5 , 4 , FALSE) ==> P(W>16)P(W=17)P(W=18)
+We - 1 since:
+  # test(26 - 10 -1, 5 , 4 , FALSE) ==> P(W>15)P(W=16)P(W-17)
+  we want the specific value of W=16, thats why it is included
+         
+          
+```{r}
+c(minw_A, w_A, ew_A) # w_A > ew_A
+
+# looking in the upper tail, so use lower.tail = FALSE
+2 * pwilcox(w_A - minw_A - 1, n_A, n_B, lower.tail = FALSE)
+```
+
+### What if we use the sums of the ranks of the B sample?
+
+
+
+```{r}
+sum_dat
+# using the sums of the B sample
+w_B = sum_dat |> 
+  filter(method == "B") |> 
+  pull(w)
+ew_B = n_B * (n_B + n_A + 1)/2 
+minw_B = n_B * (n_B + 1)/2 
+c(minw_B, w_B, ew_B)
+# now looking in the lower tail
+2 * pwilcox(w_B - minw_B, n_B, n_A)
+```
+
+
+```{r}
+wilcox.test(A, B, paired = FALSE) 
+
+# linear regression test
+wilcox.test(yield ~ method, data = dat)
+```
+
+
+```{r}
+t.test(A, B) # t.test(yield ~ method, data = dat)
+```
+
+
+## Latent heat of fusion
+
+two independent samples, whereas before it was paried. 
+
+```{r}
+A = c(79.98, 80.04, 80.02, 80.04, 80.03, 80.03, 80.04, 
+      79.97, 80.05, 80.03, 80.02, 80.00, 80.02)
+B = c(80.02, 79.94, 79.98, 79.97, 79.97, 80.03, 79.95, 
+      79.97)
+heat = data.frame(
+  energy = c(A,B),
+  method = rep(c("A","B"), c(length(A), length(B))))
+```
+
+To perform the Wilson test, you have to rank the observation
+
+some of the ranks have fx 4.5 (decimal) => means there are ties
+```{r}
+heat = heat |> 
+  dplyr::mutate(r = rank(energy))
+# or equivalently
+# heat$rank = rank(heat$energy)
+heat |> arrange(r) 
+```
+
+```{r}
+heat |>
+  dplyr::group_by(method) |> 
+  dplyr::summarise(
+    w = sum(r), # observed test statistic = 180
+    xbar = mean(energy),
+    sd = sd(energy),
+    n = n()
+  ) |> 
+  knitr::kable(format = "markdown", 
+               digits = 3)
+
+# heat
+```
+
+Slide 20:
+Find the p-value $= P(Z > 2.7)$
+```{r}
+1-pnorm(2.7 , 0 , 1) # 0.00347
+```
+
+
+
+```{r}
+ggplot(heat, aes(x = method, y = energy)) + 
+  geom_boxplot() + 
+  geom_dotplot(stackdir = "center",
+               binaxis = "y") +
+  theme_linedraw(base_size = 12) + 
+  labs(y = "Heat of fusion (cal/g)",
+       x = "Method")
+```
+
+
+```{r}
+heat_sum = heat |>
+  dplyr::group_by(method) |> 
+  dplyr::summarise(
+    w = sum(r),
+    xbar = mean(energy),
+    s = sd(energy),
+    n = n()
+  )
+heat_sum
+```
+
+```{r}
+na = heat_sum$n[heat_sum$method == "A"]
+nb = heat_sum$n[heat_sum$method == "B"]
+N = na + nb # total number of observations
+c(na, nb, N)
+```
+
+
+```{r}
+w = heat_sum$w[heat_sum$method == "A"]
+EW = na * (N + 1)/2
+c(w, EW)
+```
+
+```{r}
+sumsqrank = sum(heat$r^2)
+g = N * (N + 1)^2/4
+varW = na * nb * (sumsqrank - g)/(N * (N - 1))
+t0 = (w - EW)/sqrt(varW)
+t0
+```
+
+```{r}
+1 - pnorm(t0)
+```
+
+### Test using wilcox.test
+
+quite rubox to outliers
+
+```{r}
+wilcox.test(A, B, alternative = 'greater', correct = FALSE)
+```
+
+```{r}
+t.test(A, B, alternative = 'greater')
+```
+
+
+### Robustness
+
+
+```{r}
+# change the first value for the B method
+heat1 = heat
+heat1$energy[14] = 80.20 # instead of 80.02
+# recalculate ranks
+heat1 = heat1 |> dplyr::mutate( 
+  r = rank(energy)
+)
+heat1
+```
+
+```{r}
+heat1 |>
+  dplyr::group_by(method) |> 
+  dplyr::summarise(
+    w = sum(r),
+    Mean = mean(energy),
+    SD = sd(energy),
+    n = n()
+  ) |> 
+  knitr::kable(digits = 3)
+```
+
+
+```{r}
+ggplot(heat1) + 
+  aes(x = method, y = energy) + 
+  geom_boxplot() + 
+  geom_dotplot(stackdir = "center",
+               binaxis = "y") +
+  labs(y = "Heat of fusion (cal/g)",
+       x = "Method")
+```
+
+
+```{r}
+wilcox.test(energy ~ method, data = heat1, 
+            alternative = 'greater',
+            correct = FALSE)
+wilcox.test(energy ~ method, data = heat, 
+            alternative = 'greater',
+            correct = FALSE)
+```
+
+```{r}
+t.test(energy ~ method, data = heat1, alternative = 'greater')
+t.test(energy ~ method, data = heat, alternative = 'greater')
+```
+
+## Notched boxplot
+slide 26.
+
+They do not overlap
+Remember our $H_0$ : There is no overlap in data
+```{r}
+ggplot(heat, aes(x = method, y = energy)) + 
+  geom_boxplot(notch = TRUE) + 
+  geom_dotplot(stackdir = "center",
+               binaxis = "y") +
+  theme_linedraw(base_size = 12) + 
+  labs(y = "Heat of fusion (cal/g)",
+       x = "Method")
+```

@@ -1,0 +1,244 @@
+---
+title: "Palmer Archipelago penguins"
+author: "39123456"
+date: "`r format(Sys.time(), '%d %B, %Y %H:%M')`"
+bibliography: [refs/bibliography.bibtex, refs/Packages.bib]
+format: 
+  html: 
+    embed-resources: true # Creates a single HTML file as output
+    code-fold: true # Code folding; allows you to show/hide code chunks
+    code-tools: true # Includes a menu to download the code file
+table-of-contents: true # (Optional) Creates a table of contents!
+number-sections: true # (Optional) Puts numbers next to heading/subheadings
+---
+
+```{r setup, message = FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(palmerpenguins)
+library(tidyverse)
+library(ggplot2)
+library(patchwork)
+library(ggpubr)
+# creates a file with the bibtex for packages used:
+knitr::write_bib(c(.packages(),
+                   "knitr", "rmarkdown"), "refs/packages.bib")
+# extra bibliography for manually added references bibliography.bibtex
+```
+
+## Introduction
+
+@palmerpenguins looked at the characteristics of three species of penguin living on the Palmer Archipelago [@fig-penguin-pics].
+The Adelie penguin (*Pygoscelis adeliae*) has a distinctive white ring around the eye.
+The Chinstrap penguin (*Pygoscelis antarcticus*) has a narrow black band under its head, which makes it appear as if it is wearing a black helmet.
+The Gentoo penguin (*Pygoscelis papua*) has a white patch on its head.
+
+```{r fig-penguin-pics, echo = FALSE, out.width= '45%', out.height= '20%', fig.cap = "The three species of Antarctic penguins studied: *Adelie, Chinstrap* and *Gentoo*.", fig.show='hold', fig.align='center'} 
+knitr::include_graphics("images/lter_penguins.png")
+```
+
+
+### Data Wrangling
+
+The calculations in this report were performed in R [@R-base] within the Rmarkdown environment [@rmarkdown2018] for reproducibility. Data wrangling was performed in base R and the tidyverse [@tidyverse2019]. Graphs were produced with ggplot2 [@tidyverse2019] except for the QQ plots which were made with the ggpubr package [@R-ggpubr]. Additional figure manipulation was performed with patchwork [@R-patchwork].
+
+Names of the variables were cleaned and shortened. Missing values were not removed at this stage, but will dealt with on a case by case basis, to conserve as much data as possible.
+
+```{r input, message=FALSE}
+data(penguins, package = 'palmerpenguins')
+#head(penguins_raw)
+penguins <- penguins_raw
+old_names = colnames(penguins_raw)
+penguins = penguins_raw %>%
+  janitor::clean_names()
+
+penguins$species <- as.factor(penguins$species)
+levels(penguins$species) <- c("Adelie","Chinstrap","Gentoo")
+myPalette <- c("darkorange","purple","cyan4")
+names(myPalette)   <- levels(penguins$species) 
+```
+
+## Results
+
+### Is flipper length significantly different at the p < 0.05 level between *Adelie* and *Chinstrap* penguins?
+
+In the left panel of @fig-flipper_v_body_mass flipper length can be seen to be roughly proportional to body mass. The distribution of flipper lengths is shown as a histogram on the right of @fig-flipper_v_body_mass. To test if flipper length is the same for *Adelie* and *Chinstrap* penguins, we perform a two sample t-test of the two means.
+
+```{r fig-flipper_v_body_mass, fig.asp=0.5, out.width= "100%", warning=FALSE, message=FALSE, fig.cap= "Aspects of flipper length for all three species studied. **A**: Flipper length vs body mass **B**: Histogram of flipper length"}
+p1 <-  ggplot(penguins) + 
+  # add the aesthetics
+  aes(x = body_mass_g, 
+      y = flipper_length_mm,
+      colour = species) +
+  # add a geometry
+  geom_point() + 
+  
+  scale_color_manual(values = myPalette) +
+  # tidy up the labels
+  labs(x = "Body mass (g)",
+       y = "Flipper length (mm)",
+       colour = "Species") 
+
+
+p2 <- ggplot(penguins) + 
+  # add the aesthetics
+  aes(x = flipper_length_mm,
+      fill = species) +
+  # add a geometry
+  geom_histogram() + 
+  scale_fill_manual(values = myPalette)  + 
+  labs(x = "Flipper length (mm)", y = "Count", fill = "Species")
+
+p1  + p2 + plot_layout(guides = 'collect') +
+  plot_annotation(tag_levels = 'A')
+```
+
+
+```{r}
+#| label: tbl-summary_stats
+#| tbl-cap: "Flipper length in Palmer Island penguin species."
+formatted = penguins %>% select(flipper_length_mm, species) %>% group_by(species)  %>% drop_na() %>%
+  summarise(n = n(),
+            Mean = mean(flipper_length_mm) %>% signif(2),
+            SD = sd(flipper_length_mm) %>% signif(2)
+            )
+knitr::kable(formatted)
+```
+
+```{r fig-flipper_length_normality, out.width = "100%", fig.asp = 0.5, fig.cap = "Sidde by side boxplots showing approximately equal spread of flipper length across Adelie and Chinstrap with corresponding QQ plots "}
+penguins %>% filter(species != "Gentoo") %>%
+  group_by(species)  %>% 
+  select(c(species, flipper_length_mm)) %>% 
+  drop_na() -> mydata
+
+p1 <-  ggplot(mydata,aes(x = species, y = flipper_length_mm, colour = species)) + 
+  geom_boxplot(outlier.shape = NA) + #remove outliers so not confused with jitter
+  geom_jitter() +
+  scale_color_manual(values = myPalette[c(1:2)])   +
+  labs(y = "Flipper length (mm)", x = "Species")
+
+p2 <-  ggqqplot(mydata, x = "flipper_length_mm", facet.by = "species")
+
+p1 + p2 + plot_annotation(tag_levels = 'A')
+```
+
+```{r}
+penguins$flipper_length_mm[penguins$species %in% "Adelie"] -> fl_a
+penguins$flipper_length_mm[penguins$species %in% "Chinstrap"] -> fl_c
+myTest <- t.test(fl_a, fl_c, var.equal = TRUE)
+```
+
+1. **Hypothesis**:  Let $\mu_A$ and $\mu_C$ be the population mean flipper lengths for *Adelie* and *Chinstrap* penguins respectively.
+$H_0$: $\mu_A$ = $\mu_C$ vs $H_1$: $\mu_A \ne \mu_C$
+
+2. **Assumptions**: The two populations are normally distributed (the points are all reasonably close to the line in the QQ plot in the right panel of @fig-flipper_length_normality) and have roughly equal variances (the estimated standard deviations are quite similar in @tbl-summary_stats and the spreads look similar in the boxplots in @fig-flipper_length_normality).
+
+3. **Test statistic**: $T = \frac{\bar{X}_A - \bar{X}_C}{S_p \sqrt{\frac{1}{n_A} + \frac{1}{n_C}}}\sim t_{n_A+n_B-2}$ where $n_A =$ `r formatted$n[1]`, $n_C =$ `r formatted$n[2]` and $S_p = \sqrt{\frac{(n_A-1)S^2_A + (n_C-1)S^2_C}{n_A + n_C-2}}$.
+
+4. **Observed test statistic**: $t_0$ = `r signif(myTest$statistic,3)`
+
+5. **p-value**: $2P(t_{`r myTest$parameter`} \le `r signif(myTest$statistic,3)`)  `r format.pval(myTest$p.value,digits = 2, eps = 0.001)`$
+
+6. **Decision**: Since the p-value is less than 0.05, we reject the null hypothesis and conclude there is a significant difference in the mean flipper lengths between these two species.
+
+### Is culmen length in Gentoo penguins consistent with a previously published study?
+
+The culmen is the upper ridge of a bird's bill. @fig-culmen_length_v_body_mass shows that the culmen is roughly proportional to body mass for Adelie and Gentoo penguins. Chinstrap penguins tend to have longer beaks. 
+
+The field scientists thought the culmen of the Adelie penguins observed on Palmer island were shorter than published values for Adelie penguins observed on the mainland, which was $\mu = 40 \pm 2 mm$ (ref). To test if this was significant, we performed a one-sided t-test against the published population mean. 
+
+```{r fig-culmen_length_v_body_mass, warning=FALSE, fig.cap= "Culmen length against body mass for the three species of penguin."}
+penguins %>%
+  ggplot() + 
+  # add the aesthetics
+  aes(x = body_mass_g, 
+      y = culmen_length_mm,
+      colour = species) +
+  # add a geometry
+  geom_point() + 
+  scale_color_manual(values = myPalette) +
+  # tidy up the labels
+  labs(x = "Body mass (g)",
+       y = "Culmen length (mm)",
+       colour = "Species") +
+  ggtitle("Culmen length in penguin species")
+```
+First, we check the assumptions.
+
+```{r fig-culmen_normality, out.width = "100%", fig.asp = 0.5, fig.cap = "A boxplot showing a symmetric distribution for the culment lengths of Adelie penguins and a corresponding QQ plot where the points are all close to the line consistent with what we would expect to see when sampling from a normal population."}
+penguins %>% filter(species == "Adelie") %>%
+  group_by(species)  %>% 
+  select(c(species, culmen_length_mm)) %>% 
+  drop_na() -> mydata
+
+p1 <-  ggplot(mydata,aes(x = species, y = culmen_length_mm, colour = species)) + 
+  geom_boxplot(outlier.shape = NA) + #remove outliers so not confused with jitter
+  geom_jitter() +
+  scale_color_manual(values = myPalette)  + 
+  labs(y = "Culmen length (mm)", x = "")
+
+p2 <-  ggqqplot(mydata, x = "culmen_length_mm")
+
+p1  + p2 + plot_annotation(tag_levels = 'A')
+```
+* **Hypothesis:** $H_0: \mu = 40.0$ mm vs $H_1 :\mu < 40.0$ mm
+
+* **Assumptions:** Observations $X_i$ are iid $N(\mu,\sigma^2)$ random variables. Culmen lengths in Adelie penguins do appear to be normally distributed (the points are close to the straight line in @fig-culmen_normality)
+
+* **Test statistic:** $T = \frac{\bar{X} − \mu_0}{S/\sqrt{n}}$. Under $H_0, T \sim t_{n-1}$.
+```{r}
+t0 <- t.test(mydata$culmen_length_mm, mu = 40.0, alternative = "less")
+```
+
+* **Observed test statistic:** $t_0 =$ `r signif(t0$statistic,3)` with `r t0$parameter` degrees of freedom
+
+* **p-value**: $P(t_{`r t0$parameter`} \le `r signif(t0$statistic,3)`)  `r format.pval(t0$p.value,digits = 2, eps = 0.001)`$
+
+* **Decision**: Reject in $H_0$ favour of $H_1$, as the observed test statistic, `r signif(t0$statistic,3)`, is smaller than the critical value of `r round(qt(0.05, 150), 2)`. The data supports scientists' belief that the culmen length for the Palmer Archipelago Adelie penguins is less than 40mm.
+
+
+### Are the genders equally split in penguin species?
+
+The bar chars in @fig-penguin_sex_bar show that the sexes of all 3 penguin species look like they are split evenly, but to test this formally we do a chi-square test for homogeneity of sex across the three species. [Note that in doing a test for homogeneity we have assumed that the researchers went out and deliberately sampled a from each species (population).]
+
+```{r fig-penguin_sex_bar, fig.cap="Distribution of sexes in penguin species surveyed"}
+penguins %>% select(species, sex) %>%  drop_na() %>%
+  ggplot(aes(species))  + 
+  geom_bar(aes(fill = sex, colour = species), position = "dodge", linewidth = 2) + 
+  scale_fill_manual(values = c("lightpink","lightblue")) +
+  scale_color_manual(values = myPalette)
+```
+
+```{r}
+set.seed(1)
+chiqMF <-  chisq.test(table(penguins$sex,penguins$species))
+chiqMF_sim <-  chisq.test(table(penguins$sex,penguins$species), simulate.p.value = TRUE)
+```
+
+1. **Hypotheses**: $H_0$: The proportion of males and females is the same across each species of penguins.  $H_1$: The gender ratio is not the same for one or more species.
+
+2. **Assumptions**: researchers sampled the penguins randomly from each species and did not enroll matched numbers of each sex.  $e_i$ = $np_i \ge 5$, which we have checked and confirmed to be `r all(chiqMF$expected > 5)`.
+
+3. **Test statistic**: $T = \sum_i^k \frac{(Y_i - e_i)^2}{e_i} \sim \chi^2_2$.
+
+4. **Observed test statistic**: $t_0$ = `r signif(chiqMF$statistic,2)`
+
+5. **p-value**: $P(\chi^2_2 \ge$ `r signif(chiqMF$statistic,2)` ) = `r format.pval(chiqMF$p.value,digits = 3, eps = 0.001)`
+
+6. **Decision**: Since the p-value is close to 1, we do not reject the null hypothesis. The distribution of the two sexes is not significantly different across the penguin species.
+
+While not necessary in this case, because the assumptions were met, we could also have performed the test using a simulation based approach and obtained a similarly large p-value of `r signif(chiqMF_sim$p.value,3)`.
+
+## Conclusion
+
+Penguins are threatened species in the Antarctic. This study on the penguins of the Palmer archipelago aims to monitor changes in penguin populations over time. 
+
+Here we showed that there was a significant difference in the flipper length between Adelie and Chinstrap penguins. 
+
+However culmen length of Adelie penguins on the Palmer peninsula is significantly shorter than that found in a previous study for Adelie penguins on the Antarctic mainland. We hope to investigate whether this is due to genetic or environmental factors on our subsequent return to the Palmer peninsula if further grant funding is successful.
+
+The proportion of male and female penguins was found to be the same across the three species.
+
+
+## References
+
+

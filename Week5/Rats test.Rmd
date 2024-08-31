@@ -1,0 +1,163 @@
+---
+title: "Rats"
+output: html_document
+date: "2024-08-26"
+---
+
+## Does the biochemical substance have an inhibitive effect on muscular growth?
+
+### Paired $t$-tests approach
+
+```{r}
+library(tidyverse)
+library(dplyr)
+# rat holds the dataframe for the bio vs the normal leg. 
+# d is the difference, weight [g]
+rat = data.frame(
+  bio = c(1.7, 2.0, 1.7, 1.5, 1.6, 
+          2.4, 2.3, 2.4, 2.4, 2.6),
+  pla = c(2.1, 1.8, 2.2, 2.2, 1.5, 
+          2.9, 2.9, 2.4, 2.6, 2.5)
+) |> mutate(d = pla - bio)
+rat |> summarise(mean = mean(d), sd = sd(d))
+```
+
+
+
+```{r}
+rat |> ggplot() + 
+  aes(x = "", y = d) + 
+  geom_boxplot() + 
+  geom_dotplot(
+    binaxis = "y", 
+    stackdir = "center") + 
+  labs(x = "", 
+       y = "Difference\n(placebo - biochemical)")
+```
+
+\textbf{Workflow}
+
+Hypothesis: $H_0: \mu_d = 0$ \textbf{vs} $H_1: \mu_d > 0$
+    
+Assumptions: $D_i$ are independent and identically distributed (iid) $\mathcal{N}(\mu, \sigma^2)$.
+    
+Test statistic:
+$$ T = \frac{\bar{D} - \mu_d}{S_d/\sqrt{n}}. \text{ Under } H_0, T \sim t_{n-1}$$
+    
+Observed test statistic:
+
+Since they ask for an "inhibitive effect", we use "greater"
+```{r}
+t.test(x = rat$d, alternative = "greater")
+```
+
+$$ t_0 = \frac{0.25}{0.33/\sqrt{10}} = 2.39$$
+    
+p-value:
+$$P(t_9 \geq 2.39) = 0.02$$
+    
+Conclusion: The p-value of 0.02 is less than 0.05, therefore we reject the null hypothesis at the $5\%$ level of significance and conclude that the biochemical substance does inhibit muscle growth.
+
+
+## Critical value approach
+
+Given $\alpha = 0.05$, then the critical value $c$ is:
+```{r}
+qt(p = 0.95, df = 9) # c
+```
+
+This means that if $t_0 > c \Rightarrow$ reject $H_0$ given that the rejection region is in the upper tail.
+
+Why is the rejection region only in the upper tail of the t distribution?  
+Because:"inhibitive effect" => we use "greater"
+
+
+## Rejection region approach
+
+For $H_1: \mu_d > \mu_0$ we can define a rejection region using our test statistic:
+$$t_0 = \frac{\bar{D} - \mu_0}{s_d / \sqrt{n}} \geq c$$
+
+Noting that,
+$$ \alpha = P\left( \frac{\bar{D} - \mu_0}{S_d / \sqrt{n}} \geq c \right) = P\left( \bar{D} \geq \mu_0 + c \frac{s_d}{\sqrt{n}} \right)$$
+
+we define a rejection region on the measurement scale as:
+$$\left\{ \bar{D}: \bar{D} \geq \mu_0 + c \frac{s_d}{\sqrt{n}} \right\}$$
+
+Calculations:
+```{r}
+n = nrow(rat)
+qt(0.95, df = 9) * sd(rat$d)/sqrt(n)
+```
+
+$$\mu_0 + cs_d / \sqrt{n} = 1.833 \times 0.33 / \sqrt{10} = 0.19$$
+
+Rejection region on the measurement scale:
+$$\left\{ \bar{d}: \bar{d} \geq 0.19 \right\}$$
+
+Hence, we would reject the null hypothesis when we observe a sample mean difference greater than 0.19 grams.
+
+In the present case, the sample mean difference was 0.25 grams, so we reject the null hypothesis.
+
+
+# Sign Test
+
+```{r}
+rat |> mutate(
+  pos_d = d > 0
+) |> arrange(d)
+```
+
+```{r}
+# number of positive differences (TRUE = 1, FALSE = 0)
+sum(rat$d > 0) 
+
+# number of non-zero differences
+sum(rat$d != 0)
+```
+
+## Workflow
+
+Let $p_+$ be the probability of a positive difference between the treated leg and the placebo leg (difference = placebo - treatment).
+
+\begin{itemize}
+\item \textbf{Hypothesis:} $H_0: p_+ = \frac{1}{2}$ \textbf{vs} $H_1: p_+ > \frac{1}{2}$
+    
+\item \textbf{Assumptions:} Differences, $D_i$, are independent.
+    
+\item \textbf{Test statistic:} Let $T$ be the number of positive differences out of the 9 non-zero differences. Under $H_0$, $T \sim B(9, \frac{1}{2})$. I.e. under $H_0$, $T$ follows a binomial distribution with $n = 9$ and $p = 0.5$.
+    
+\item \textbf{Observed test statistic:} We observed $t_0 = 6$ positive differences in the sample.
+    
+\item \textbf{p-value:} Probability of a test statistic as or more extreme than we observed,
+$$P(T \geq 6) = 1 - P(T \leq 5) = 1 - \text{pbinom}(5, \text{size} = 9, \text{prob} = 1/2) \approx 0.2539$$
+    
+\item \textbf{Conclusion:} As the p-value is greater than 0.05, the data are consistent with the null hypothesis at the 5\% level of significance. There is no significant difference between the biochemical and the placebo.
+
+\end{itemize}
+
+3 negative, 6 positive:
+```{r}
+s = sign(rat$d)[sign(rat$d) != 0]
+table(s)
+```
+
+Specify number of successes and the number of failures:
+```{r}
+binom.test(c(6, 3), p = 0.5, alternative = "greater")
+```
+
+Specify number of successes and the total number of trials:
+```{r}
+binom.test(sum(s==1), n = length(s), p = 0.5, alternative = "greater")
+```
+The p-value using the sign test is 0.254.
+
+On the other hand, with paired $t$-test:
+```{r}
+t.test(rat$d, mu = 0, alternative = "greater")
+```
+The p-value using the $t$-test is 0.020! NOT TRUE
+
+In this case the paired $t$-test and the sign test give conflicting results.
+
+This is not uncommon when the sample size is small.

@@ -1,0 +1,234 @@
+---
+title: "Lab wk05"
+date: "2024-08-29"
+format: 
+  html:
+    code-tools: true
+    embed-resources: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# Group work (Power)
+
+4.  
+Find the smallest sample size, $n$, we could choose to be at least 90% sure of finding evidence at the 5% level when $\mu=1$?
+
+Result is $n = 10.08 \approx 11$.
+
+$$d=\frac{|\mu_1 - \mu_2|}{\sigma}=\frac{0-1}{1}=1$$
+
+```{r}
+library(pwr)
+pwr.t.test(d = 1, 
+           sig.level = 0.05, 
+           power = 0.9, 
+           type = "one.sample",  # use ?pwr.t.test 
+           alternative = "greater") 
+```
+
+# Questions
+
+## Blood alcohol readings
+
+The following are 30 blood alcohol determinations made by Analyzer GTE-10, a 3-year-old unit that may be in need of re-calibration. All 30 measurements were made using a test sample on which a properly adjusted machine would give a reading of 12.6%.
+
+```{r}
+bac = c(12.3,12.7,12.6,13.1,13.2,12.8,13.1,12.9,13.1,12.4,13.6,12.7,12.6,13.1,12.4,12.6,13.3,12.6,12.4,13.1,12.9,12.6,12.7,12.5,12.4,12.4,12.6,12.7,12.4,12.9)
+n = length(bac)
+xbar = mean(bac)
+s = sd(bac)
+c(n, xbar, s)
+```
+
+a. Let $\mu$ denote the true average reading that the Analyzer GTE-10 would give on the test sample. Write out the hypothesis for the Analyzer GTE-10 being faulty.
+
+$\mu_0 = 12.6\%$
+
+$$H_0 : \mu_0 = \mu \text{ vs. } H_1 : \mu_0 \neq \mu$$
+
+b. What are the assumptions of this test? Are they satisfied?
+```{r}
+# Q-Q plot
+library(ggplot2)
+qqnorm(bac)
+qqline(bac, col = "red")
+```
+
+We are performing a one-sample $t$-test which is two-sided.  
+- Follow a normal distribution  
+- Must be iid 
+
+
+c. Assuming that the readings are normally distributed, the test statistic will follow a $t$-distribution. How many degrees of freedom will the test have?
+
+d. Calculate the observed test statistic.
+
+e. The critical value at the 5% level of significance is 2.045. At the level of significance , what is your conclusion?
+
+```{r}
+df = 30-29
+# h_1 is ≠ which is two-sided
+sig = 1-0.05 # = 0.95 => (0.025, 0.975)
+
+# result:
+qt(0.975, df = 29)
+```
+
+$P(t_29 > 2.644)$
+but we have to times 2 since two-sided: $2P(t_{29} > 2.644)$
+```{r}
+#2*pt(t0, 29, ??)
+```
+
+f. Perform the test in R using the t.test() function.
+
+```{r}
+t.test(bac, mu = 12.6, alternative ="two.sided")
+```
+
+## Life satisfaction
+
+A research study was conducted to examine the differences between older and younger adults on perceived life satisfaction. Thirty older adults (between 40 and 50) and thirty younger adults (between 20 and 30) were give a life satisfaction test (known to have high reliability and validity). Scores on the measure range from 0 to 60 with high scores indicative of high life satisfaction with low scores indicative of low life satisfaction. We’re interested in seeing if there is a difference in the mean life satisfaction between young and old people. Carefully study the R output below before answering the questions below.
+
+```{r}
+# age: 20-30
+Young = c(24, 26, 40, 29, 29, 41, 32, 19, 23, 25, 37, 31, 31, 29, 24, 
+          42, 32, 13, 33, 25, 20, 26, 20, 23, 23, 15, 34, 29, 20, 38)
+# age: 40-50
+Old = c(27, 26, 45, 34, 34, 45, 36, 20, 22, 24, 35, 31, 26, 41, 31, 
+        37, 31, 12, 38, 26, 22, 27, 21, 31, 23, 24, 27, 33, 22, 40)
+
+# Base R approach:
+c(length(Young), length(Old))
+
+c(sd(Old), sd(Young), sd(Old-Young))
+```
+
+
+```{r}
+# tidyverse method
+library("tidyverse")
+dat = tibble(
+  satisfaction = c(Young, Old), 
+  age = c(rep("Young", length(Young)),
+          rep("Old", length(Old))))
+dat |> 
+  group_by(age) |> 
+  summarise(
+    n = n(),
+    mean = mean(satisfaction),
+    sd = sd(satisfaction))
+```
+
+
+```{r}
+# Quick visualisation using base R (not ggplot)
+par(mfrow = c(1,2), mar = c(4,5,0.5,0.5))
+boxplot(Young, Old, names = c('Young', 'Old'), ylab = "Life satisfaction")
+boxplot(Old - Young, ylab = 'Difference in life satisfaction\n(Old - Young)')
+```
+
+### Test
+
+Two-sample $t$-test.  
+- It does assume equal variances, but looking at the box-plot they are kind of the same. Therefore we assume equal variances
+
+```{r}
+7.835155	/ sqrt(30) # Old
+7.435624	/ sqrt(30) # Young
+```
+
+
+a. Which hypothesis test should be used and why?
+
+$$H_0 : \mu_{Young} - \mu_{Old} = 0 \text{  vs.  } H_1 : \mu_{Young} - \mu_{Old} \neq 0$$
+or
+
+$$H_0 : \mu_{Young} = \mu_{Old} \text{  vs.  } H_1 : \mu_{Young} \neq \mu_{Old}$$
+b. State the null and alternative hypotheses.
+
+c. What assumptions have been made in order for the test to be valid? Are they reasonable? Give reasons.
+
+d. Calculate the appropriate test statistic.
+
+$$t_0 = \frac{\mu_O - \mu_Y}{s_p \sqrt{1/n_Y + 1/n_O}}\sim t_{n_x+n_y-2}$$
+
+e. By comparing the test statistic with an appropriate critical value, what is your conclusion and why?
+
+```{r}
+# sig = 0.05/ 2
+# df = 30 + 30 - 2
+qt(0.025 , 58) 
+```
+
+f. Perform the test in R using the t.test() function.
+
+```{r}
+# pt(t0, 58, lower.tail = FALSE)
+```
+
+
+```{r}
+# without TRUE, it will perform a Welch test
+t.test(Young, Old, var.equal = TRUE)
+```
+
+
+
+g. Explain why the previous test is now inappropriate.
+
+h. Which hypothesis test should now be used?
+
+
+i. Repeat steps b-e.
+
+
+j. Perform the test in R using the t.test() function.
+```{r}
+# t.test(x = Old, y = Young, paired)
+```
+
+
+## Power, effect size and sample size
+
+### Calculating effect size given a test statistic
+
+$$d= \frac{t_0}{\sqrt{n}} = \frac{3.25}{\sqrt{25+1}}=0.634$$
+Which means that the effect size is medium $0.5 < 0.634 < 0.8$. 
+```{r}
+3.25/sqrt(26) 
+```
+
+### Using pwr.t.test()
+
+At least n=100. 
+
+```{r}
+library(pwr)
+pwr.t.test(d = 0.4, 
+           sig.level = 0.05, 
+           power = 0.8, 
+           type = "two.sample",  
+           alternative = "two.sided") 
+```
+
+
+How does this change as the effect size changes (e.g. from 0.1 to 0.8)? 
+Plot the sample size required to achieve a power of 80% against effect size.
+
+
+
+# Quiz \#4
+
+```{r}
+# Data
+x <- c(1.83, 0.50, 1.62, 2.48, 1.68, 1.88, 1.55, 2.06, 1.30)
+y <- c(0.878, 0.647, 0.598, 2.05, 1.06, 1.29, 1.06, 3.14, 1.29)
+
+# Perform the Wilcoxon signed-rank test
+wilcox.test(x, y, paired = TRUE, alternative = "greater", correct=TRUE)
+```
