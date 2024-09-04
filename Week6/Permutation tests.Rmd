@@ -210,3 +210,71 @@ What proportion of test statistics from randomly permuted data are more extreme 
 mean(abs(t_null) >= abs(tt$statistic))
 ```
 This is our permutation test p-value.
+
+
+# Permutation test: paired samples
+
+For paired tests: think difference $d_i=x_i - y_i$
+and then the test is the $sign(d_i)$
+
+
+## Smoking
+
+Blood samples from 11 individuals before and after they smoked a cigarette are used to measure aggregation of blood platelets.
+Is the aggregation affected by smoking?
+```{r}
+before = c(25, 25, 27, 44, 30, 67, 53, 53, 52, 60, 28)
+after =  c(27, 29, 37, 36, 46, 82, 57, 80, 61, 59, 43)  
+d = after - before
+t.test(d)
+```
+
+
+
+```{r}
+# Different permutations of sign of 11 d_i.
+sign_permute = permutations(c(-1,1), 11, replace = TRUE)
+dim(sign_permute)
+
+head(sign_permute)
+```
+
+$$t_0=\frac{\mu}{sd \times \sqrt{n}}$$
+```{r}
+# org test statistic
+(t0_original = mean(d)/sd(d)*sqrt(length(d)))
+```
+
+
+
+```{r}
+
+n = length(d)
+B = nrow(sign_permute) # all different sign
+t_null = vector("numeric", B)
+
+for(i in 1:nrow(sign_permute)){
+  d_permute = d*sign_permute[i,] # permuted difference vector: org diff * permuted signs
+  t_null[i] = mean(d_permute)/sd(d_permute)*sqrt(n) # test static under this null dist
+}
+
+# two taail type setting
+mean(abs(t_null) >= abs(t0_original))
+```
+
+```{r}
+# org test statictis
+t.test(d)$p.value
+```
+
+
+
+```{r}
+t_null |> data.frame() |> ggplot() + aes(x = t_null) + 
+  geom_histogram(alpha=0.5) + 
+  geom_vline(xintercept = t0_original, colour = "red", linetype = "dashed") + 
+  geom_text(aes(x = t0_original, label = "Original test statistic", y = Inf), 
+            colour = "red", angle = 90, hjust = 1, vjust = -1, size = 7) + 
+  labs(x = "Test statistics from permuted samples", y = "Count")
+```
+

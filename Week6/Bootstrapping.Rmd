@@ -1,0 +1,287 @@
+---
+title: "Bootstrapping"
+date: "2024-09-02"
+author: "Ellen Ebdrup"
+output: 
+  html_document: 
+    ### IMPORTANT ###
+    # self_contained: true # Creates a single HTML file as output
+    code_folding: show # Code folding; allows you to show/hide code chunks
+    ### USEFUL ###
+    code_download: true # Includes a menu to download the code file
+    ### OPTIONAL ###
+    df_print: paged # Sets how dataframes are automatically printed
+    theme: readable # Controls the font, colours, etc.
+    toc: true # (Useful) Creates a table of contents!
+    toc_float: true # table of contents at the side
+    number_sections: false # (Optional) Puts numbers next to heading/subheadings
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+Resampling Technic
+
+With replacement
+
+# Confidence intervals
+
+Estimation <> Hypothesis testing
+parameter       statement regaring pop parameter
+
+$$\text{measure of variability : } \hat{\theta} \pm \text{margin of error}
+=\bar{X} \pm c \cdot SE(\bar{X}) $$
+
+$\hat{\theta} = \bar{X}$ is the point estimate, sample mean  
+$c$ is the critical value from some dist.  
+$SE(\hat{\theta}) =SE(\bar{X})$ is the sd of the point estimate: $SE(\bar{X})=\sigma / \sqrt{n}$.  
+
+If your data does not follow a normal dist => bootstrapping resaamling to emirically model the dist of the data
+
+
+
+# Bootstrapping
+
+Bootstrapping is a computational process that allows us to as make inferences about the population where no information is available about the population.
+
+The classic approach to bootstrapping is to repeatedly resample from the sample (with replacement).
+
+sample = population --> then resample from this pop
+
+Bootstrapping is useful when: 
+- the theoretical distribution of a statistic is complicated or unknown (e.g. coefficient of variation, quantile regression parameter estimates, etc.)
+- the sample size is too small to make any sensible parametric inferences about the parameter
+
+Advantages:
+- Bootstrapping frees us from making parametric assumptions to carry out inferences
+- Provides answers to problems for which analytic solutions are impossible
+- Can be used to verify, or check the stability of results
+- Asymptotically consistent
+
+
+
+# Speed of light
+
+The true value is 33.02
+
+```{r}
+library(readr)
+speed_file = read_csv("https://raw.githubusercontent.com/DATA2002/data/master/speed_of_light.txt")
+speed = speed_file$Speed_of_Light
+
+mean(speed) # = 26.2 --> pretty far away from true value
+
+median(speed)
+```
+
+```{r}
+library(ggplot2)
+p1 = ggplot(speed_file) + aes(x="", y = Speed_of_Light) + 
+  geom_boxplot(colour = "red", outlier.size = 4) + 
+  labs(x = "", y = "Speed") + coord_flip()
+p2 = ggplot(speed_file) + aes(x = Speed_of_Light) + 
+  geom_histogram(colour = "red") + 
+  labs(x = "Speed")
+cowplot::plot_grid(p1, p2, ncol = 1, align = "v")
+```
+
+
+
+
+```{r}
+mean(speed)
+```
+
+
+## Bootstrapping speed of light measurements
+```{r}
+set.seed(123)
+B = 10000
+result = vector("numeric", length = B)
+for(i in 1:B){
+  newData = sample(speed, replace = TRUE)
+  result[i] = mean(newData) # with replacement
+}
+round(head(result), 2)
+```
+
+
+
+```{r}
+hist(result, col = "lightblue")
+```
+
+
+## Bootstrap confidence intervals
+
+The simple process we will use. Find the quantiles  
+If result has our bootstrap estimates then we can get a 95% confidence interval using:
+```{r}
+(CI = quantile(result, c(0.025, 0.975)))
+
+# is definied to be symmetric, but is not - because the bootstrap dist is not symmetric
+CI - mean(speed) # due to swqeedness 
+```
+
+The bootstrap confidence interval is not symmetric about the mean!
+```{r}
+hist(result, breaks = 50,
+     col = "lightblue")
+abline(v = CI, col = "red", lwd = 3)
+```
+
+### Compared with the CI using the $t$-distribution:
+```{r}
+xbar = mean(speed)
+n = length(speed)
+se = sd(speed)/sqrt(n)
+c(xbar, n, se)
+```
+
+
+```{r}
+(critical_values = qt(c(0.025,0.975), df = n-1))
+
+# classical 
+(CI_t = xbar + critical_values*se)
+```
+
+plot below shows the difference between the CI using bootstrap (red) and t-dist (blue)
+```{r}
+hist(result, breaks = 50,
+     col = "lightblue")
+abline(v = CI, col = "red", lwd = 3) # with bootstrap 
+abline(v = CI_t, col = "blue", lwd = 3, lty = 2) # with t-dist
+```
+
+## What if we trimmed the data?
+- deleting observations due to reasons
+```{r}
+hist(speed, col = "lightblue",breaks = 15)
+```
+Keep only the positive speeds:
+```{r}
+speed1 = speed[speed>0]
+mean(speed)
+
+mean(speed1)
+```
+
+Now we do the exaactly the same process as before, but now we have removed some outliers
+=> not sweeued as must => pretty close to symmetric
+```{r}
+B = 10000
+result = vector("numeric", length = B)
+for(i in 1:B){
+  newData = sample(speed1, replace = TRUE)
+  result[i] = mean(newData)
+}
+```
+Very reasuring
+
+
+```{r}
+(CI = quantile(result, c(0.025, 0.975)))
+
+CI - mean(speed1)
+```
+
+```{r}
+hist(result, breaks = 50, col = "lightblue")
+abline(v = CI, col = "red", lwd = 3)
+```
+
+### Compared with the CI using the $t$-distribution:
+```{r}
+xbar = mean(speed1)
+n = length(speed1)
+se = sd(speed1)/sqrt(n)
+c(xbar, n, se)
+
+(critical_values = qt(c(0.025,0.975), df = n-1))
+
+(CI_t = xbar + critical_values*se) # very similar to the bootstrap CI
+```
+
+Very close on plot now
+```{r}
+hist(result, breaks = 50,
+     col = "lightblue")
+abline(v = CI, col = "red", lwd = 3)
+abline(v = CI_t, col = "blue", 
+       lwd = 3, lty = 2)
+```
+
+
+
+# Flight departure delays
+
+
+```{r}
+# install.packages("nycflights13")
+library(nycflights13)
+library(pillar)
+glimpse(flights)
+```
+
+
+### New York City to San Fransisco
+```{r}
+sfo = flights |> filter(flights$dest == "SFO")
+```
+
+
+
+```{r}
+library(ggplot2)
+sfo |>  ggplot() + aes(x = arr_delay/60) +
+  geom_histogram() + 
+  labs(x = "Arrival delay (hours)")
+```
+
+## Travel policy
+
+An organisation regularly flies staff from NYC to SFO. It decides that it is acceptable for staff to be late 2% of the time. How early should they book their flights to ensure that staff arrive on time?
+```{r}
+quantile(sfo$arr_delay, p = 0.98, na.rm = TRUE)
+```
+
+The 98th percentile of the arrival delay distribution is about 2.5 hours, so we should send them on a flight about 2.5 hours early.
+
+• What if we didn’t have the population data?
+
+## Sample of flights
+
+If all we had access to was a sample of 100 flights from 2013, this is our point estimate of the 98th percentile.
+
+```{r}
+set.seed(2)
+sfo_sample = sfo %>% filter(!is.na(arr_delay)) %>% sample_n(size = 100, replace = FALSE)
+quantile(sfo_sample$arr_delay, p = 0.98)
+```
+
+• How reliable is that point estimate?
+rather than calc pop mean by bootstrapping, we man use it to calc CI for any statistc (here CI quantile)
+
+## Bootstrap CI for quantiles
+
+```{r}
+B = 10000
+q98 = vector("numeric", length = B)
+for(i in 1:B) {
+  resample = sample(sfo_sample$arr_delay, 
+                    replace = TRUE)
+  q98[i] = quantile(resample, probs = 0.98)
+}
+par(cex = 2)
+hist(q98, col = "lightblue")
+```
+
+
+A 95% confidence interval for this quantile:
+```{r}
+quantile(q98, c(0.025,0.975))
+```
+Based on our sample our (bootstrap) 95% confidence interval is between 1 hour and 3 hours.

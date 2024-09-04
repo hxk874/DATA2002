@@ -1,0 +1,75 @@
+---
+title: "Thought process"
+output: html_document
+date: "2024-09-04"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+**Step 1: Generate the Dataset We’ll create two samples:**
+Sample 1: Normally distributed data.   
+Sample 2: Slightly right-skewed data from a Chi-square distribution with the same mean as the normal distribution.
+
+**Step 2: Perform Statistical Tests**
+
+• Wilcoxon rank-sum test: A non-parametric test that does not assume normality.
+
+• Welch’s two-sample t-test: A t-test that does not assume equal variances between the two samples.
+
+**Step 3: Visualize the Data**
+
+We will use a combination of histograms and density plots to visualize the differences between the two samples
+
+```{r}
+# Load necessary libraries
+
+library(ggplot2)
+
+# Set seed for reproducibility
+set.seed(100)
+
+# Parameters
+n <- 30  # Moderate sample size
+mu <- 8   # Mean for the normal distribution
+sigma <- 2  # Standard deviation for the normal distribution
+df <- 10  # Degrees of freedom for chi-square distribution (moderate skewness)
+
+
+# Generate sample 1 from a normal distribution
+sample1 <- data.frame(x =  rnorm(n, mean = mu, sd = sigma), distribution = "Normal Distribution")
+
+# Generate sample 2 from a chi-square distribution, shifted to have the same mean as the normal
+sample2 <- data.frame(x =  rchisq(n, df = df), distribution = "Chi-square Distribution")
+
+combined_df <- rbind(sample1, sample2)
+
+## generate some summary stats for the two samples 
+combined_df |> group_by(distribution) |> 
+ summarise(mean = mean(x), 
+          variance = sd(x)^2, 
+          median = median(x), 
+            n = n())
+```
+
+
+
+
+```{r}
+# Perform Wilcoxon rank-sum test (non-parametric)
+wilcox_test <- wilcox.test(sample1$x, sample2$x)
+
+# Print test results
+print(wilcox_test)
+```
+
+```{r}
+# Perform Welch's two-sample t-test (assumes unequal variances)
+welch_test <- t.test(sample1$x, sample2$x, var.equal = FALSE)
+
+# Print test results
+print(welch_test)
+```
+
+Note that the echo = FALSE parameter was added to the code chunk to prevent printing of the R code that generated the plot.

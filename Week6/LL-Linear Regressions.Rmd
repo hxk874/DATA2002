@@ -1,0 +1,527 @@
+---
+title: "Revision + Linear Regression"
+output: html_document
+date: "2024-09-04"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Module 2: Testing Means
+
+## Case 1: small sample size (n=5)
+```{r}
+# Load necessary libraries
+library(ggplot2)
+
+# Set seed for reproducibility
+set.seed(123)
+
+# Simulation parameters
+n <- 5 # Sample size
+num_simulations <- 1  # Number of simulations
+
+# Case 1: IID observations from a normal distribution
+mu <- 0     # True mean
+sigma <- 1  # True standard deviation
+
+# Case 2: IID observations from a Chi-square distribution with moderate skewness
+df <- 5  # Degrees of freedom for Chi-square distribution (moderate skewness)
+# Create data frames for plotting
+normal_df <- data.frame(x = rnorm(n, mean = mu, sd = sigma), distribution = "Normal Distribution")
+chisq_df <- data.frame(x =  rchisq(n, df = df), distribution = "Chi-square Distribution")
+
+
+# Combine data frames
+combined_df <- rbind(normal_df, chisq_df)
+
+sum_stats <- combined_df |> 
+  group_by(distribution) |> 
+  summarise(mean = mean(x), 
+            sd = sd(x), 
+            median = median(x), 
+            n = n())
+  
+sum_stats 
+```
+
+
+```{r}
+## generate a normal and an exponential (right-skewed distribution)
+
+# Load necessary libraries
+library(ggplot2)
+
+# Set seed for reproducibility
+set.seed(123)
+
+# Simulation parameters
+n <- 5  # Sample size
+num_simulations <- 10000  # Number of simulations
+
+# Case 1: IID observations from a normal distribution
+mu <- 0     # True mean
+sigma <- 1  # True standard deviation
+
+# Simulate sample means from a normal distribution
+normal_sample_means <- replicate(num_simulations, {
+  sample_data <- rnorm(n, mean = mu, sd = sigma)
+  mean(sample_data)
+})
+
+# Case 2: IID observations from a Chi-square distribution with moderate skewness
+df <- 5  # Degrees of freedom for Chi-square distribution (moderate skewness)
+true_mean_chisq <- df  # Mean of the Chi-square distribution
+true_sd_chisq <- sqrt(2 * df)  # Standard deviation of the Chi-square distribution
+
+# Simulate sample means from a Chi-square distribution
+chisq_sample_means <- replicate(num_simulations, {
+  sample_data <- rchisq(n, df = df)
+  mean(sample_data)
+})
+
+# Create data frames for plotting
+normal_df <- data.frame(sample_means = normal_sample_means, distribution = "Normal Distribution")
+chisq_df <- data.frame(sample_means = chisq_sample_means, distribution = "Chi-square Distribution (df = 5)")
+
+# Combine data frames
+combined_df <- rbind(normal_df, chisq_df)
+
+# Calculate the normal density for both cases based on the sample means' distribution
+# 1. Case 1 (Normal Distribution)
+mean_case1 <- mu
+se_case1 <- sigma / sqrt(n)  # Standard error of the sample mean
+
+# 2. Case 2 (Chi-square Distribution using CLT)
+mean_case2 <- true_mean_chisq
+se_case2 <- true_sd_chisq / sqrt(n)  # Standard error of the sample mean (from Chi-square distribution)
+
+# Plot histograms of sample means for both cases with normal density overlay
+ggplot(combined_df, aes(x = sample_means, fill = distribution)) +
+  geom_histogram(aes(y = ..density..), color = "black", alpha = 0.6, bins = 30, position = "identity") +
+  geom_density(alpha = 0.2) +
+  
+  # Overlay the normal density curve in red for Case 1 (Normal Distribution)
+  stat_function(fun = dnorm, args = list(mean = mean_case1, sd = se_case1), 
+                color = "red", size = 1, data = subset(combined_df, distribution == "Normal Distribution")) +
+  
+  # Overlay the normal density curve in red for Case 2 (Chi-square Distribution)
+  stat_function(fun = dnorm, args = list(mean = mean_case2, sd = se_case2), 
+                color = "red", size = 1, data = subset(combined_df, distribution == "Chi-square Distribution (df = 5)")) +
+  
+  facet_wrap(~distribution, scales = "free") +
+  theme_minimal() +
+  labs(
+    x = "Sample Mean", y = "Density") +
+  theme(legend.position = "none")
+```
+
+## Case 2: large sample size (n=30)
+
+```{r}
+# Load necessary libraries
+library(ggplot2)
+
+# Set seed for reproducibility
+set.seed(123)
+
+# Simulation parameters
+n <- 30 # Sample size
+num_simulations <- 1  # Number of simulations
+
+# Case 1: IID observations from a normal distribution
+mu <- 0     # True mean
+sigma <- 1  # True standard deviation
+
+# Case 2: IID observations from a Chi-square distribution with moderate skewness
+df <- 5  # Degrees of freedom for Chi-square distribution (moderate skewness)
+# Create data frames for plotting
+normal_df <- data.frame(x = rnorm(n, mean = mu, sd = sigma), distribution = "Normal Distribution")
+chisq_df <- data.frame(x =  rchisq(n, df = df), distribution = "Chi-square Distribution")
+
+
+# Combine data frames
+combined_df <- rbind(normal_df, chisq_df)
+
+sum_stats <- combined_df |> 
+  group_by(distribution) |> 
+  summarise(mean = mean(x), 
+            sd = sd(x), 
+            median = median(x), 
+            n = n())
+
+sum_stats 
+```
+
+
+```{r}
+## generate a normal and an exponential (right-skewed distribution)
+
+
+# Load necessary libraries
+library(ggplot2)
+
+# Set seed for reproducibility
+set.seed(123)
+
+# Simulation parameters
+n <- 30  # Sample size
+num_simulations <- 10000  # Number of simulations
+
+# Case 1: IID observations from a normal distribution
+mu <- 0     # True mean
+sigma <- 1  # True standard deviation
+
+# Simulate sample means from a normal distribution
+normal_sample_means <- replicate(num_simulations, {
+  sample_data <- rnorm(n, mean = mu, sd = sigma)
+  mean(sample_data)
+})
+
+# Case 2: IID observations from a Chi-square distribution with moderate skewness
+df <- 5  # Degrees of freedom for Chi-square distribution (moderate skewness)
+true_mean_chisq <- df  # Mean of the Chi-square distribution
+true_sd_chisq <- sqrt(2 * df)  # Standard deviation of the Chi-square distribution
+
+# Simulate sample means from a Chi-square distribution
+chisq_sample_means <- replicate(num_simulations, {
+  sample_data <- rchisq(n, df = df)
+  mean(sample_data)
+})
+
+# Create data frames for plotting
+normal_df <- data.frame(sample_means = normal_sample_means, distribution = "Normal Distribution")
+chisq_df <- data.frame(sample_means = chisq_sample_means, distribution = "Chi-square Distribution (df = 5)")
+
+# Combine data frames
+combined_df <- rbind(normal_df, chisq_df)
+
+# Calculate the normal density for both cases based on the sample means' distribution
+# 1. Case 1 (Normal Distribution)
+mean_case1 <- mu
+se_case1 <- sigma / sqrt(n)  # Standard error of the sample mean
+
+# 2. Case 2 (Chi-square Distribution using CLT)
+mean_case2 <- true_mean_chisq
+se_case2 <- true_sd_chisq / sqrt(n)  # Standard error of the sample mean (from Chi-square distribution)
+
+# Plot histograms of sample means for both cases with normal density overlay
+ggplot(combined_df, aes(x = sample_means, fill = distribution)) +
+  geom_histogram(aes(y = ..density..), color = "black", alpha = 0.6, bins = 30, position = "identity") +
+  geom_density(alpha = 0.2) +
+  
+  # Overlay the normal density curve in red for Case 1 (Normal Distribution)
+  stat_function(fun = dnorm, args = list(mean = mean_case1, sd = se_case1), 
+                color = "red", size = 1, data = subset(combined_df, distribution == "Normal Distribution")) +
+  
+  # Overlay the normal density curve in red for Case 2 (Chi-square Distribution)
+  stat_function(fun = dnorm, args = list(mean = mean_case2, sd = se_case2), 
+                color = "red", size = 1, data = subset(combined_df, distribution == "Chi-square Distribution (df = 5)")) +
+  
+  facet_wrap(~distribution, scales = "free") +
+  theme_minimal() +
+  labs(
+    x = "Sample Mean", y = "Density") +
+  theme(legend.position = "none")
+```
+
+## Case 3: very large sample size (n=100)
+
+```{r}
+# Load necessary libraries
+library(ggplot2)
+
+# Set seed for reproducibility
+set.seed(123)
+# Simulation parameters
+n <- 100 # Sample size
+num_simulations <- 1  # Number of simulations
+
+# Case 1: IID observations from a normal distribution
+mu <- 0     # True mean
+sigma <- 1  # True standard deviation
+
+# Case 2: IID observations from a Chi-square distribution with moderate skewness
+df <- 5  # Degrees of freedom for Chi-square distribution (moderate skewness)
+# Create data frames for plotting
+normal_df <- data.frame(x = rnorm(n, mean = mu, sd = sigma), distribution = "Normal Distribution")
+chisq_df <- data.frame(x =  rchisq(n, df = df), distribution = "Chi-square Distribution")
+
+
+# Combine data frames
+combined_df <- rbind(normal_df, chisq_df)
+
+sum_stats <- combined_df |> 
+  group_by(distribution) |> 
+  summarise(mean = mean(x), 
+            sd = sd(x), 
+            median = median(x), 
+            n = n())
+
+sum_stats 
+```
+
+```{r}
+## generate a normal and an exponential (right-skewed distribution)
+
+
+# Load necessary libraries
+library(ggplot2)
+
+# Set seed for reproducibility
+set.seed(123)
+
+# Simulation parameters
+n <- 100  # Sample size
+num_simulations <- 10000  # Number of simulations
+
+# Case 1: IID observations from a normal distribution
+mu <- 0     # True mean
+sigma <- 1  # True standard deviation
+
+# Simulate sample means from a normal distribution
+normal_sample_means <- replicate(num_simulations, {
+  sample_data <- rnorm(n, mean = mu, sd = sigma)
+  mean(sample_data)
+})
+
+# Case 2: IID observations from a Chi-square distribution with moderate skewness
+df <- 5  # Degrees of freedom for Chi-square distribution (moderate skewness)
+true_mean_chisq <- df  # Mean of the Chi-square distribution
+true_sd_chisq <- sqrt(2 * df)  # Standard deviation of the Chi-square distribution
+
+# Simulate sample means from a Chi-square distribution
+chisq_sample_means <- replicate(num_simulations, {
+  sample_data <- rchisq(n, df = df)
+  mean(sample_data)
+})
+
+# Create data frames for plotting
+normal_df <- data.frame(sample_means = normal_sample_means, distribution = "Normal Distribution")
+chisq_df <- data.frame(sample_means = chisq_sample_means, distribution = "Chi-square Distribution (df = 5)")
+
+# Combine data frames
+combined_df <- rbind(normal_df, chisq_df)
+
+# Calculate the normal density for both cases based on the sample means' distribution
+# 1. Case 1 (Normal Distribution)
+mean_case1 <- mu
+se_case1 <- sigma / sqrt(n)  # Standard error of the sample mean
+
+# 2. Case 2 (Chi-square Distribution using CLT)
+mean_case2 <- true_mean_chisq
+se_case2 <- true_sd_chisq / sqrt(n)  # Standard error of the sample mean (from Chi-square distribution)
+
+# Plot histograms of sample means for both cases with normal density overlay
+ggplot(combined_df, aes(x = sample_means, fill = distribution)) +
+  geom_histogram(aes(y = ..density..), color = "black", alpha = 0.6, bins = 30, position = "identity") +
+  geom_density(alpha = 0.2) +
+  
+  # Overlay the normal density curve in red for Case 1 (Normal Distribution)
+  stat_function(fun = dnorm, args = list(mean = mean_case1, sd = se_case1), 
+                color = "red", size = 1, data = subset(combined_df, distribution == "Normal Distribution")) +
+  
+  # Overlay the normal density curve in red for Case 2 (Chi-square Distribution)
+  stat_function(fun = dnorm, args = list(mean = mean_case2, sd = se_case2), 
+                color = "red", size = 1, data = subset(combined_df, distribution == "Chi-square Distribution (df = 5)")) +
+  
+  facet_wrap(~distribution, scales = "free") +
+  theme_minimal() +
+  labs(
+    x = "Sample Mean", y = "Density") +
+  theme(legend.position = "none")
+```
+
+
+# The Rat
+
+```{r}
+rat = data.frame(
+  bio = c(1.7, 2.0, 1.7, 1.5, 1.6, 
+          2.4, 2.3, 2.4, 2.4, 2.6),
+  pla = c(2.1, 1.8, 2.2, 2.2, 1.5, 
+          2.9, 2.9, 2.4, 2.6, 2.5)
+) |> mutate(d = pla - bio, 
+            sign = 
+            case_when(d >0 ~ "+", d <0 ~ "-")) 
+
+head(rat)
+```
+
+## Sign Test in R
+```{r}
+s = sign(rat$d)[sign(rat$d) != 0]
+table(s)
+```
+
+```{r}
+binom.test(c(6, 3), p = 0.5, alternative = "greater")
+```
+
+## Wilcoxon signed-rank test in R
+```{r}
+y = c(85, 69, 81, 112, 77, 86)
+x = c(83, 78, 70, 72, 67, 68)
+d = y - x
+d
+```
+
+```{r}
+w_calc = data.frame(
+  dif = d,
+  absDif = abs(d),
+  rankAbsDif = rank(abs(d)),
+  signrank = sign(d)*rank(abs(d)) 
+
+)
+
+w_calc
+```
+
+
+```{r}
+wilcox.test(d, alternative = "greater")
+```
+
+# Bus waiting times
+
+```{r}
+ bus <- c(25, 19, 9, 27, 8, 7, 26, 12, 29, 20)
+```
+
+
+```{r}
+par(cex = 2, mar = c(4,0.4,0.5,0.5))
+boxplot(bus, horizontal = TRUE, 
+        xlab = "Waiting time (mins)")
+```
+
+
+```{r}
+par(cex = 2, mar = c(4,4,1.5,0.5))
+qqnorm(bus); qqline(bus)
+```
+
+
+
+```{r}
+ # Create data frame
+ 
+  
+  # Apply transformations
+bus <- as_data_frame(bus) %>%
+  mutate(D = value - 15,  # Difference from 15
+         sign = sign(D),   # Get the sign (+1 for positive, -1 for negative)
+         Abs_D = abs(D),   # Absolute difference
+         Rank = rank(Abs_D),  # Rank of absolute differences
+         Signed_rank = sign * Rank)  # Signed rank
+
+bus  
+```
+
+```{r}
+2*psignrank(16, 10)
+```
+
+```{r}
+wilcox.test(bus$value - 15)
+```
+
+# Smoking
+
+## Normal approximation with ties
+
+```{r}
+before = c(25, 25, 27, 44, 30, 67, 53, 53, 52, 60, 28)
+after =  c(27, 29, 37, 36, 46, 82, 57, 80, 61, 59, 43)
+df = data.frame(before, after,
+                difference = after-before)
+
+
+df = df |> dplyr::mutate(absDif = abs(difference),
+                          rankAbsDif = rank(absDif),
+                          srank = sign(difference)*rank(abs(difference)))
+df
+```
+
+
+```{r}
+(w_p = sum(df$srank[df$srank > 0]))
+
+(w_m = sum(-df$srank[df$srank < 0]))
+
+```
+
+
+```{r}
+A = c(32, 29, 35, 28)
+B = c(27, 31, 26, 25, 30)
+dat = data.frame(
+  yield = c(A,B),
+  method = c(rep("A", length(A)),
+             rep("B", length(B)))
+)
+```
+
+```{r}
+# Load the required library
+library(ggplot2)
+library(patchwork) # For combining plots
+
+# Create the box plot
+box_plot <- ggplot(dat, aes(x = method, y = yield, fill = method)) +
+  geom_boxplot() +
+  labs( 
+       x = "Method", y = "Yield") +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+
+box_plot 
+```
+
+```{r}
+
+```
+
+
+```{r}
+
+```
+
+
+
+```{r}
+
+```
+
+
+
+```{r}
+
+```
+
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+
+```{r}
+
+```
+
+
+```{r}
+
+```
+
+
+```{r}
+
+```
