@@ -1,0 +1,212 @@
+---
+title: "Permutation tests"
+date: "2024-09-02"
+author: "Ellen Ebdrup"
+output: 
+  html_document: 
+    ### IMPORTANT ###
+    # self_contained: true # Creates a single HTML file as output
+    code_folding: show # Code folding; allows you to show/hide code chunks
+    ### USEFUL ###
+    code_download: true # Includes a menu to download the code file
+    ### OPTIONAL ###
+    df_print: paged # Sets how dataframes are automatically printed
+    theme: readable # Controls the font, colours, etc.
+    toc: true # (Useful) Creates a table of contents!
+    toc_float: true # table of contents at the side
+    number_sections: false # (Optional) Puts numbers next to heading/subheadings
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Permutation tests
+
+## Visual inference
+Example of how different combinations of thee same data can be visualied. 
+
+```{r}
+library(nullabor) # you probably need to run: install.packages("nullabor")
+library(ggplot2)
+set.seed(1)
+lineup_df = lineup(null_permute('mpg'), mtcars, pos = 10)
+lineup_df |> ggplot() + 
+  aes(x = mpg, y = wt) + 
+  geom_point() + 
+  facet_wrap(~ .sample) + theme_linedraw() + 
+  theme(strip.text.x = element_text(size = 16, face = "bold")) + 
+  labs(x = "Miles/(US) gallon", y = "Weight (1000 lbs)")
+```
+
+## Tea Lady example
+### Permutations
+
+We could also consider all 40,320 different orderings (permutations) of 8 cups of tea.
+```{r}
+# install.packages("arrangements")
+library(arrangements)
+permute_8 = permutations(8)
+head(permute_8, 6) # look at the "first" 6 permutations
+```
+
+```{r}
+tail(permute_8, 6) # look at the "last" 6 permutations
+```
+
+Use the `permuations()` function on the truth vector:
+```{r}
+truth = c("milk","tea","tea","milk","tea","tea","milk","milk")
+permute_guess = permutations(truth)
+permute_guess[92, ] # 92nd permutation
+```
+
+
+We can check if a particular sequence of tea cups is identical to the true sequence:
+```{r}
+identical(truth, truth)
+
+identical(permute_guess[92,], truth) # this one shows that the Lady was not correct
+```
+
+
+### Exact p-value
+
+We can calculate the exact p-value by looking across all permutations:
+```{r}
+B = nrow(permute_guess)
+check_correct = vector("numeric", length = B)
+for(i in 1:B) { # iterate over all rows and ask: are the prediction the same as the truth?
+  check_correct[i] = identical(permute_guess[i,], truth)
+}
+c(sum(check_correct), mean(check_correct))
+# mean(check_correct): avg num of times it was correct == Fisheres exact test P-value
+```
+
+The p-value is the same as we get using Fisher’s exact test!
+```{r}
+truth = c("milk", "tea", "tea", "milk", "tea", "tea", "milk", "milk")
+predicted = c("milk", "tea", "tea", "milk", "tea", "tea", "milk", "milk")
+tea_mat = table(truth, predicted)
+fisher.test(tea_mat, alternative = "greater")$p.value # Same as mean(check_correct) from above
+```
+
+
+### Approximate p-value
+
+Often it’s not feasible to consider all $n!$ permutations, so we can sample() a selection of them.
+```{r}
+set.seed(123)
+truth = c("milk","tea","tea","milk","tea","tea","milk","milk")
+B = 10000
+result = vector(length = B) # initialise outside the loop
+for(i in 1:B){
+  # without replacement
+  guess = sample(truth, size = 8, replace = FALSE) # does the permutation
+  result[i] = identical(guess, truth)
+}
+mean(result) # result of just guessing
+```
+Which is pretty close to the exact p-value (= 0.01428)
+
+
+# Permutation test: two independent samples
+
+## Plant growth
+The `PlantGrowth` data has results from an experiment to compare yields (as measured by dried weight of plants) obtained under a control and two different treatment conditions (Dobson, 1983, Table 7.1).
+
+3 different treatment gruops (red, green, blue)
+
+```{r}
+# built into R, make it available
+data("PlantGrowth") 
+library(tidyverse)
+PlantGrowth |> ggplot() +
+  aes(y = weight, x = group, 
+      colour = group) + 
+  geom_boxplot(coef = 10) + 
+  geom_jitter(width = 0.1, size = 5) + 
+  theme(legend.position = "none") +
+  labs(y = "Weight (g)", x = "Group")
+```
+
+We want to compare the control group to the treatment 2 group.
+```{r}
+(dat = PlantGrowth |> filter(group %in% c("ctrl", "trt2")))
+```
+
+### Checking for normality: Q-Q plot
+
+```{r}
+ dat |> 
+  ggplot() + aes(sample = weight) + 
+  geom_qq() + geom_qq_line() + 
+  facet_grid(cols = vars(group), labeller = label_both) + 
+  labs(y = "Weight (g)", x = "Standard normal quantiles")
+```
+
+### What do our “standard” methods say?
+
+Two-sample t-test
+```{r}
+t.test(weight ~ group, data = dat, var.equal = TRUE)
+```
+
+Wilcoxon rank-sum test
+```{r}
+wilcox.test(weight ~ group, data = dat)
+```
+
+Extracting information from t.test objects
+```{r}
+tt = t.test(weight ~ group, data = dat, var.equal = TRUE)
+tt
+
+names(tt)
+
+tt$statistic
+```
+
+
+### Permutation test
+
+
+Permute class labels (many times). See what values we get for the t-test statistic.
+```{r}
+B = 10000 # number of permuted samples we will consider
+permuted_dat = dat # make a copy of the data
+t_null = vector("numeric", B) # initialise outside loop
+for(i in 1:B) {
+  permuted_dat$group = sample(dat$group) # this does the permutation
+  t_null[i] = t.test(weight ~ group, data = permuted_dat)$statistic
+}
+```
+
+```{r}
+t_null |> 
+  data.frame() |> 
+  ggplot() + 
+  aes(x = t_null) + 
+  geom_histogram(binwidth = 0.15) + 
+  labs(x = "Test statistics from permuted samples")
+```
+
+```{r}
+data.frame(abs_t_null = abs(t_null)) |> 
+  ggplot() + 
+  aes(x = abs_t_null) +
+  geom_histogram(binwidth = 0.1,
+                 boundary = 0) + 
+  geom_vline(
+    xintercept = abs(tt$statistic), 
+    col = "red", lwd = 2) + 
+  labs(
+    x = "Absolute value of test statistic"
+  )
+```
+
+What proportion of test statistics from randomly permuted data are more extreme than the test statistic we observed?
+```{r}
+mean(abs(t_null) >= abs(tt$statistic))
+```
+This is our permutation test p-value.
