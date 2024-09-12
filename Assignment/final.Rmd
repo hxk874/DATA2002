@@ -1,7 +1,7 @@
 ---
-title: "Your title here"
+title: "DATA2x02 Assignment"
 date: "`r Sys.Date()`"
-author: "540...."
+author: "540940662"
 output: 
   html_document:
     self_contained: true # Creates a single HTML file as output
@@ -10,6 +10,7 @@ output:
     toc: true # (Optional) Creates a table of contents!
     toc_float: true # table of contents at the side
     number_sections: true # (Optional) Puts numbers next to heading/subheadings
+    fig_caption: true
 
 table-of-contents: true # (Optional) Creates a table of contents!
 number-sections: true # (Optional) Puts numbers next to heading/subheadings
@@ -18,8 +19,8 @@ bibliography: [refs/bibliography.bibtex, refs/packages.bib]
 ---
 
 
-
 ```{r setup, message = FALSE}
+# {r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 
 #| message: false
@@ -30,8 +31,8 @@ library(gendercoder)
 library(ggplot2)
 library(janitor)
 library(hms)
-library(ggthemes) # Load theme_stata()
-theme_set(theme_gray())
+library(ggthemes) 
+theme_set(theme_grey())
 
 # creates a file with the bibtex for packages used:
 knitr::write_bib(c(.packages(),
@@ -47,30 +48,58 @@ x = readxl::read_excel("data/DATA2x02_survey_2024_Responses.xlsx")
 "Data Analytics: Learning from Data"
 
 
-# Introduction
-< 1. Isthis a random sample of DATA2X02 students? >
-
 ```{r}
-library('vctrs')
-vec_count(x$enrolled_unit, sort = "count")
+# Load the cleaned data from the "data" folder
+cleaned_data <- read.csv("data/cleaned_survey_data.csv")
 ```
 
-In this report we explore the results from a survey taken by 313 students from the units DATA2002 and DATA2902, 252 and 58 respectively (with 3 students not specifying their unit) - corresponding to around 37% and 69% respectively which suggest that there was an uneven participation rate between the two groups. 
-The original results can be found via the [link](https://docs.google.com/spreadsheets/d/1CR33C_oUu2QqbKWshnk5pP_-wwRIx8z9RCtWN7cVVWw/pub?output=xlsx) [@data2002survey]. 
 
-Therefore, the sample does not represent a random cross-section of all DATA2X02 students.
+# Introduction
+< 1. Is this a random sample of DATA2X02 students? >
 
-< 2. What are the potential biases? Which variables are most likely to be subjected to this bias? >
+In this report we explore the results from a survey taken by 313 students from the units DATA2002 and DATA2902, 252 and 58 students respectively (with 3 students not specifying their unit) - corresponding to around 37% and 69% respectively which suggest that there was an uneven participation rate between the two groups. 
+The original results can be found via this [link](https://docs.google.com/spreadsheets/d/1CR33C_oUu2QqbKWshnk5pP_-wwRIx8z9RCtWN7cVVWw/pub?output=xlsx) [@data2002survey]. 
 
-Additionally, because participation was optional, it relied on students' willingness and availability to complete the survey, introducing a self-selection bias. This type of bias occurs when individuals decide whether to participate in the survey, which may result in overrepresentation or underrepresentation of certain types of students.
-- more engaged students participate....
-Variables: ...
+The sample of participated student is not a random sample since it a) does represents random cross-section of all DATA2X02 students - hence the 37% and 69% participation percentage and b) the participation was optional, which leads potentials bias. See @fig-uni_year_units
+
+
+```{r}
+#| label: fig-uni_year_units
+#| fig-cap: "Distribution among the participated students from the DATA2x02 units. Notice that 3 second year student didn't specify thier unit. The total number of participated students is 313."
+
+# Create a bar plot
+cleaned_data$university_year <- factor(cleaned_data$university_year,
+                                       levels = c("First year", "Second year", "Third year","Fourth year", "Fifth or higher year"),
+                                       exclude = NULL)  # This includes NA in the factor levels, treated as an additional level
+
+ggplot(cleaned_data, aes(x = enrolled_unit, fill = university_year)) +
+  geom_bar(position = "dodge") +
+  labs(title = "Distribution of University Year by Enrolled Unit",
+       x = "Enrolled Unit",
+       y = "Count") +
+  theme_minimal() +
+  scale_fill_brewer(palette = "Paired", name = "University Year")  # Customize the legend title
+
+```
+
+< 2. What are the potential biases? >
+
+Since it relies on students' willingness and availability to complete the survey, there might be a self-selection bias. This type of bias occurs when individuals decide whether to participate in the survey, which may result in over- or underrepresentation of certain types of students.
+For example could we assume more engaged students participate more often. 
+
+< Which variables are most likely to be subjected to this bias? >
+
+The study habits variables are likely to be subjected to self-selection bias. This includes target grade, performance, study hours, academic personality, and university year - students who are more diligent or organized might be more likely to participate, skewing the data towards higher study hours or more consistent study routines.
 
 
 < 3. Which questions needed improvement to generate useful data (e.g. in terms of the way the question was phrased or response validation)? >
-Height
-Show size
-favorite Anime 
+
+The questions that needed the most improvement includes `height`, `shoe_size` and `usual_bedtime`. Common among these variables was that responses included different units which made the interpretation of them almost impossible. 
+Height, being the least impossible of them, still gave reason to difficulties. Firstly, the units where very different. Some answered in cm/centimeter, m/meter, foot/ft, inches, signs(+, ', \backslash) or just numbers (with or without decimals) without specifying unit. Same goes for the shoe size, this variable was even harder to interpret because of the diversity of how countries define shoe size. Therefore we have no idea if size 10 is Australian, Japanese, European, Chinese and so on and if it is a woman or mans size since that also differs within.  
+Overall these two variables beacuse of thier units, made the cleaning and interpretation very difficult. 
+Lastly the variable `usual_bedtime` didn't specify if the time is given using the 12-hour or 24-hour clock. Therefore we can't know exactly if a student goes to bad at 6:30 pm or am? We could that 3:30 must be am, but we can't be certain and thus not let our own bias influence our interpretation of the data. 
+Overall, after a lot of trying to untangle these variables, I decided not to use them in my tests.  
+
 
 # Report structure
 
@@ -87,17 +116,6 @@ As for the initial data processing, the provided guide from (@tarr2024) is used.
 
 The first thing to note is that the column names, while very descriptive are terrible for programming with. Let's fix that. We can store a copy of the column names in the vector `old_names`:
 
-```{r}
-old_names = colnames(x)
-length(x) # number of columns
-
-new_names = c("timestamp", "target_grade", "assignment_preference", "trimester_or_semester", "age", "tendency_yes_or_no", "pay_rent", "urinal_choice", "stall_choice", "weetbix_count", "weekly_food_spend", "living_arrangements", "weekly_alcohol", "believe_in_aliens", "height", "commute", "daily_anxiety_frequency", "weekly_study_hours", "work_status", "social_media", "gender", "average_daily_sleep", "usual_bedtime", "sleep_schedule", "sibling_count", "allergy_count", "diet_style", "random_number", "favourite_number", "favourite_letter", "drivers_license", "relationship_status", "daily_short_video_time", "computer_os", "steak_preference", "dominant_hand", "enrolled_unit", "weekly_exercise_hours", "weekly_paid_work_hours", "assignments_on_time", "used_r_before", "team_role_type", "university_year", "favourite_anime", "fluent_languages", "readable_languages", "country_of_birth", "wam", "shoe_size") 
-# overwrite the old names with the new names: 
-colnames(x) = new_names 
-# combine old and new into a data frame: 
-name_combo = bind_cols(New = new_names, Old = old_names) 
-name_combo |> gt::gt()
-```
 
 Before cleaning any data, we look through the column to investigate the magnitude of change needed.
 
@@ -107,1097 +125,20 @@ The columns not listed below, have also been cleaned in the omfang of for exampl
 Furthermore, we have changed all characters to be small letters and made sure that numbers within a column are of the same datatype (e.i. float, int)
 
 
-### trimester_or_semester
-
-```{r}
-unique(sort(x$trimester_or_semester))
-
-x <- x |> 
-  mutate(trimester_or_semester_clean = case_when(
-    trimester_or_semester %in% c("At my home university I have a 4 block system with to units at a time. I prefer that.", "Block structure where you have 4 main teaching session per year, and then only two courses at a time :)") ~ "Quadmester",
-    trimester_or_semester %in% c("Depends", "Nomester", "Not sure") ~ "No preference",
-    TRUE ~ trimester_or_semester,
-    TRUE ~ NA_character_  # Handle any unexpected cases
-  )) |>
-  mutate(trimester_or_semester_clean = factor(trimester_or_semester_clean, 
-                                              levels = c("Semester", "Trimester", "Quadmester", "No preference", NA)))
-
-# Check the unique values after cleaning
-sort(unique(x$trimester_or_semester_clean))
-```
-
-### age
-
-```{r}
-unique(sort(x$age))
-
-# Clean and convert the age column
-x <- x |> 
-  mutate(age_clean = case_when(
-    str_detect(age, "\\d+\\.*\\d*") ~ as.numeric(str_extract(age, "\\d+\\.*\\d*")),  # Extract numbers from the string
-    str_detect(age, "days") ~ as.numeric(str_extract(age, "\\d+")) / 365,  # Convert days to years
-    TRUE ~ NA_real_  # Handle any unexpected cases
-  )) |> 
-  mutate(age_clean = round(age_clean))  # Round to the nearest integer
-
-# Filter out unrealistic ages
-x <- x |> 
-  mutate(age_clean = ifelse(age_clean >= 10 & age_clean < 100, age_clean, NA_real_))
-
-sort(unique(x$age_clean))
-```
-
-### tendency_yes_or_no
-
-```{r}
-sort(unique(x$tendency_yes_or_no))
-x <- x |> 
-  mutate(tendency_yes_or_no_clean = case_when(
-    tendency_yes_or_no %in% c("More \"Yes\"") ~ "More yes",
-    tendency_yes_or_no %in% c("More \"No\"") ~ "More no",
-    TRUE ~ NA_character_  # Handle any unexpected cases
-  ))
-
-sort(unique(x$tendency_yes_or_no_clean))
-```
-
-### pay_rent
-
-```{r}
-sort(unique(sort(x$pay_rent)))
-
-# Create the mapping for the pay_rent column
-x <- x |> 
-  mutate(pay_rent_clean = case_when(
-    pay_rent == "Yes" ~ "Yes",
-    pay_rent == "No" ~ "No",
-    pay_rent == "Mortgage" ~ "Mortgage",
-    pay_rent %in% c("I pay part of utilities", "pay for college (with external help)") ~ "Partly",
-    TRUE ~ NA_character_  # Handle any unexpected cases
-  )) |>
-  mutate(pay_rent_clean = factor(pay_rent_clean,
-                                 levels = c("Yes", "No", "Partly", "Mortgage", NA)))
-
-unique(x$pay_rent_clean)
-```
-### living_arrangements
-
-```{r}
-x <- x |> 
-  mutate(living_arrangements_clean = tolower(living_arrangements))
-unique(sort(x$living_arrangements_clean))
-
-# Create the mapping for the pay_rent column
-x <- x |> 
-  mutate(living_arrangements_clean = case_when(
-    living_arrangements_clean %in% c("2 friends", "aunt and uncle and cousins", "cousins",
-                               "i live with my girlfriends parents (its complicated)",
-                               "i rent a room in sydney new south wales australia",
-                               "share house", "sharehouse with partners and siblings",
-                               "sharing with one roommate", "with friends", "with partner",
-                               "with parent(s) and partner", "with parent(s) and/or sibling(s)"
-                               ) ~ "share house, with friends, family, and/or partner",
-    TRUE ~ living_arrangements_clean,
-    TRUE ~ NA_character_  # Handle any unexpected cases
-  ))
-
-unique(x$living_arrangements_clean)
-```
-
-### height
-
-used gartth help
-
-```{r}
-unique(sort(x$height))
-```
-
-
-```{r}
-clean_height <- function(height_str) {
-  # Handle NA values
-  if (is.na(height_str)) {
-    return(NA_real_)
-  }
-  # Handle heights in centimeters directly (e.g., "175 cm" or "180cm")
-  if (str_detect(height_str, "cm")) {
-    cm_value <- as.numeric(str_extract(height_str, "\\d+\\.?\\d*"))
-    return(cm_value)
-  }
-  # Handle heights that are already in the "xxx.x" format (assumed to be meters)
-  if (str_detect(height_str, "^\\d+\\.?\\d*$")) {
-    height_value <- as.numeric(height_str)
-    # Convert meters to centimeters if the value is less than or equal to 2.5 (assuming it's in meters)
-    if (height_value <= 2.5) {
-      return(height_value * 100)
-      #show(height_value)
-    } else {
-      return(height_value)
-      #show(height_value)
-    }
-  }
-  # Default case for any other formats
-  return(NA_real_)
-}
-
-# Apply the cleaning function to the height column
-x <- x |> 
-  mutate(height_clean = sapply(height, clean_height))
-
-
-# Check the unique values after cleaning
-unique(x$height_clean)
-
-```
-
-
-
-
-```{r}
-x = x |> 
-  dplyr::mutate(
-    height_clean = readr::parse_number(height),
-    height_clean = case_when(
-      # convert meters to cm
-      height_clean <= 2.5 ~ height_clean * 100,
-      # convert the feet and inches to missing
-      height_clean <= 100 ~ NA_real_,
-      TRUE ~ height_clean
-    ),
-  )
-```
-
-
-```{r}
-x |> 
-  ggplot() + 
-  aes(x = height_clean) + 
-  geom_histogram(binwidth = 5)+ 
-  labs(x = "Count", y = "Height (cm)") 
-```
-```{r}
-x |> select(height, height_clean) |> View()
-```
-
-
-```{r}
-x = x |> 
-  mutate(height_clean = case_when(
-    # convert remaining to missisng
-    height_clean <= 100 ~ NA_real_,
-    height_clean >= 250 ~ NA_real_,
-    TRUE ~ height_clean
-  ))
-# check it's worked:
-x |> select(height, height_clean) |> View()
-```
-
-
-### commute
-
-
-```{r}
-ggplot() + 
-  aes(y = reorder(x$commute, x$commute, function(x) length(x))) + 
-  geom_bar() + 
-  labs(y = "", x = "Count") 
-```
-
-### social_media
-
-```{r}
-x |> janitor::tabyl(social_media) |> 
-  gt::gt() |> 
-  gt::fmt_percent(columns = 3:4, decimals = 1) |> 
-  gt::cols_label(social_media = "Favourite social media platform")
-```
-
-
-```{r}
-x= x |> mutate(
-  social_media_clean = tolower(social_media),
-  social_media_clean = str_replace_all(social_media_clean, '[[:punct:]]',' '),
-  social_media_clean = stringr::word(social_media_clean),
-  social_media_clean = case_when(
-    stringr::str_starts(social_media_clean,"in") ~ "instagram",
-    stringr::str_starts(social_media_clean,"ig") ~ "instagram",
-    stringr::str_starts(social_media_clean,"tik") ~ "tiktok",
-    stringr::str_starts(social_media_clean,"we") ~ "wechat",
-    stringr::str_starts(social_media_clean,"twi") ~ "twitter",
-    stringr::str_starts(social_media_clean,"x") ~ "twitter",
-    stringr::str_starts(social_media_clean,"mess") ~ "facebook",
-    stringr::str_starts(social_media_clean,"bil") ~ "bilibili",
-    is.na(social_media_clean) ~ "none",
-    TRUE ~ social_media_clean
-  ),
-  social_media_clean = tools::toTitleCase(social_media_clean),
-  social_media_clean = forcats::fct_lump_min(social_media_clean, min = 10)
-)
-```
-
-
-```{r}
-x |> janitor::tabyl(social_media_clean) |> 
-  arrange(desc(n)) |> 
-  gt::gt() |> 
-  gt::fmt_percent(columns = 3, decimals = 1) |> 
-  gt::cols_label(social_media_clean = "Favourite social media platform") |> 
-  gt::cols_align(align = "left", columns = 1)
-```
-```{r}
-sort(unique(x$social_media_clean))
-
-```
-
-
-### gender
-
-garth
-
-```{r}
-install.packages("remotes", force = TRUE)
-remotes::install_github("ropenscilabs/gendercoder", force = TRUE)
-```
-
-```{r}
-x = x |> 
-  mutate(gender_clean = tolower(gender)) 
-
-sort(unique(x$gender_clean))
-```
-
-
-
-```{r}
-clean_gender <- function(gender_str) {
-  # Standardize male-related terms
-  if (gender_str %in% c("male", "m", "man", "boy", "cis male", "heterosexual male")) {
-    return("Male")
-  }
-  
-  # Standardize female-related terms
-  if (gender_str %in% c("female", "f", "woman", "girl", "femal", "biological female")) {
-    return("Female")
-  }
-  
-  if (gender_str %in% c("not female", "cisgender")) {
-    return("Other")
-  }
-  
-  # Default case (for any other values, return NA or the original value)
-  return(NA_character_)  # or return(gender_str) if you want to keep non-standard responses
-}
-
-x = x |> 
-  mutate(gender_clean = tolower(gender)) |>
-  mutate(gender_clean = sapply(gender_clean, clean_gender))
-
-sort(unique(x$gender_clean))
-
-x |> janitor::tabyl(
-  gender, gender_clean
-) |> gt::gt() |> 
-  gt::tab_spanner(label = "Recoded outcomes", columns = 2:5) |> 
-  gt::cols_label(gender = "Original outcomes")
-```
-
-```{r}
-ggplot(x, aes(x = gender_clean)) +
-  geom_bar(aes(y = (after_stat(count))/sum(after_stat(count))), fill = "skyblue", color = "black") +
-  scale_y_continuous(labels = scales::percent_format()) +
-  labs(title = "Distribution of Gender After Cleaning (Percentage)",
-       x = "Gender",
-       y = "Percentage") +
-  theme_minimal()
-```
-
-
-
-### average_daily_sleep
-
-```{r}
-sort(unique(x$average_daily_sleep))
-```
-
-```{r}
-# Function to clean and extract numeric values from the average_daily_sleep column
-clean_sleep <- function(sleep_str) {
-  # Convert to lowercase to handle variations in text
-  sleep_str <- tolower(sleep_str)
-  
-  # Handle NA values directly
-  if (is.na(sleep_str)) {
-    return(NA_real_)
-  }
-  
-  # Handle ranges like "4-5" or "8-10h"
-  if (str_detect(sleep_str, "[-~]")) {
-    #show(sleep_str)
-    numbers <- as.numeric(unlist(str_extract_all(sleep_str, "\\d+\\.?\\d*")))
-    #show(numbers)
-    return(mean(numbers))
-  }
-  
-  # Handle hours with minutes (e.g., "7 hours 15 mins.")
-  if (str_detect(sleep_str, "hours") & str_detect(sleep_str, "mins")) {
-    hours <- as.numeric(str_extract(sleep_str, "\\d+(?=\\s*hours)"))
-    mins <- as.numeric(str_extract(sleep_str, "\\d+(?=\\s*mins)"))
-    return(hours + mins / 60)
-  }
-  
-  # Handle minutes only (e.g., "440 minutes")
-  if (str_detect(sleep_str, "minutes")) {
-    minutes <- as.numeric(str_extract(sleep_str, "\\d+"))
-    return(minutes / 60)
-  }
-  # Handle cases with plain numeric values or hours (e.g., "8", "8h", "7 hours")
-  if (str_detect(sleep_str, "^\\d+\\.?\\d*$") | str_detect(sleep_str, "hours?|hrs?|h|hours")) {
-    return(as.numeric(str_extract(sleep_str, "\\d+\\.?\\d*")))
-  }
-  
-  # Handle non-numeric cases (e.g., "Enough", "sleep 10 hours a day")
-  if (str_detect(sleep_str, "enough|sleep")) {
-    return(NA_real_)
-  }
-  
-  # Default case: return NA if no other condition is met
-  return(NA_real_)
-}
-
-# Apply the cleaning function to the average_daily_sleep column
-x <- x |> 
-  mutate(average_daily_sleep_clean = sapply(average_daily_sleep, clean_sleep)) |> 
-  mutate(average_daily_sleep_clean = round(average_daily_sleep_clean, digits=1))
-
-# Check the unique values after cleaning
-length(x$average_daily_sleep_clean)
-length(x$average_daily_sleep)
-sort(unique(x$average_daily_sleep_clean))
-```
-
-```{r}
-ggplot(x, aes(x = average_daily_sleep_clean)) +
-  geom_histogram(binwidth = 0.5, fill = "skyblue", color = "black") +
-  labs(title = "Distribution of Average Daily Sleep",
-       x = "Average Daily Sleep (Hours)",
-       y = "Count") +
-  theme_minimal() +
-  scale_x_continuous(breaks = seq(0, 12, 1))  # Adjust the x-axis for better readability
-
-# Plot the histogram of the cleaned data as percentages
-ggplot(x, aes(x = average_daily_sleep_clean)) +
-  geom_histogram(aes(y = (..count..)/sum(..count..) * 100), 
-                 binwidth = 0.5, fill = "skyblue", color = "black") +
-  labs(title = "Distribution of Average Daily Sleep",
-       x = "Average Daily Sleep (Hours)",
-       y = "Percentage (%)") +
-  theme_minimal() +
-  scale_x_continuous(breaks = seq(0, 12, 1)) +  # Adjust the x-axis for better readability
-  scale_y_continuous(labels = scales::percent_format(scale = 1))
-
-
-```
-
-
-
-```{r}
-# Assuming the cleaning function is already applied as shown previously
-# Now, plot the histogram with a normal curve
-x <- x |> 
-  filter(average_daily_sleep_clean != 1.0)
-
-ggplot(x, aes(x = average_daily_sleep_clean)) +
-  geom_histogram(aes(y = ..density..), binwidth = 0.5, fill = "skyblue", color = "black") +
-  stat_function(fun = dnorm, args = list(mean = mean(x$average_daily_sleep_clean, na.rm = TRUE),
-                                         sd = sd(x$average_daily_sleep_clean, na.rm = TRUE)),
-                color = "red", size = 1) +
-  labs(title = "Distribution of Average Daily Sleep with Normal Curve",
-       x = "Average Daily Sleep (Hours)",
-       y = "Density") +
-  theme_minimal() +
-  scale_x_continuous(breaks = seq(0, 12, 1))  # Adjust the x-axis for better readability
-
-```
-
-
-
-### usual_bedtime
-
-
-```{r}
-unique(x$usual_bedtime)
-```
-
-
-```{r}
-# Function to adjust the time according to the specified rules
-adjust_time <- function(time_str) {
-  # Handle NA values directly
-  if (is.na(time_str)) {
-    return(NA_character_)
-  }
-  
-  # Adjust the time based on the hour
-  time_str <- case_when(
-    str_detect(time_str, "^21:") ~ str_replace(time_str, "^21:", "09:"),
-    str_detect(time_str, "^22:") ~ str_replace(time_str, "^22:", "10:"),
-    str_detect(time_str, "^23:") ~ str_replace(time_str, "^23:", "11:"),
-    str_detect(time_str, "^00:") ~ str_replace(time_str, "^00:", "12:"),
-    TRUE ~ time_str  # Keep the time as is if it doesn't match any condition
-  )
-  
-  return(time_str)
-}
-
-# Apply the function to adjust the times
-x <- x |> 
-  mutate(ususal_bedtime_time_clean = sapply(usual_bedtime, adjust_time))
-
-# Check the unique values after adjusting the times
-sort(unique(x$ususal_bedtime_time_clean))
-
-```
-
-```{r}
- Plot the distribution of the adjusted bedtime times with vertical x-axis labels
-ggplot(x, aes(x = ususal_bedtime_time_adjusted)) +
-  geom_bar(fill = "skyblue", color = "black") +
-  labs(title = "Distribution of Adjusted Usual Bedtime Times",
-       x = "Adjusted Bedtime Time",
-       y = "Frequency") +
-  theme_minimal() +
-  scale_x_discrete(limits = sort(unique(x$ususal_bedtime_time_adjusted))) +  # Keep the times ordered
-  theme(axis.text.x = element_text(angle = 90, hjust = 1))
-
-
-```
-
-
-
-```{r}
-# Define the desired order for the x-axis labels
-desired_order <- c(
-  "06:30:00", "07:00:00", "09:00:00", "09:15:00", "09:30:00", "10:00:00", "10:30:00", "10:45:00", "11:00:00", 
-  "11:10:00", "11:15:00", "11:20:00", "11:23:00", "11:30:00", "11:40:00", "11:45:00", "11:50:00", "11:59:00", 
-  "12:00:00", "12:30:00", "12:35:00", "12:45:00", "01:00:00", "01:20:00", "01:30:00", "02:00:00", "02:30:00",
-  "03:00:00", "03:10:00", "03:20:00", "03:30:00", "04:00:00"
-)
-
-# Reorder the factor levels in the column
-x <- x |> 
-  mutate(ususal_bedtime_time_adjusted = factor(ususal_bedtime_time_adjusted, levels = desired_order))
-
-# Plot the distribution of the adjusted bedtime times with vertical x-axis labels
-ggplot(x, aes(x = ususal_bedtime_time_adjusted)) +
-  geom_bar(fill = "skyblue", color = "black") +
-  labs(title = "Distribution of Adjusted Usual Bedtime Times",
-       x = "Adjusted Bedtime Time",
-       y = "Frequency") +
-  theme_minimal() +
-  theme(axis.text.x = element_text(angle = 90, hjust = 1))
-
-
-
-```
-
-
-### sibling_count
-
-```{r}
-unique(sort(x$sibling_count))
-
-x <- x |> 
-  mutate(sibling_count_clean = case_when(
-    sibling_count %in% c("no", "none") ~ "0.0",
-    sibling_count %in% c("I have 2 siblings", "2 and my dog :)") ~ "2.0",
-    sibling_count %in% c("one", "One") ~ "1.0",
-    sibling_count %in% c("many", "Too many", "bicycle") ~ NA_character_,
-    TRUE ~ sibling_count,
-    TRUE ~ NA_character_  # Handle any unexpected cases
-  )) 
-unique(sort(x$sibling_count_clean))
-```
-
-### allergy_count
-
-```{r}
-x$allergy_count = tolower(x$allergy_count)
-
-unique(sort(x$allergy_count))   
-
-x <- x |>
-  mutate(allergy_count_clean = case_when(
-    allergy_count %in% c("don't know", "i don't know", "0~1.5", "n/a") ~ NA_character_,
-    allergy_count %in% c("zero", "no", "none", "i have no allergies","not that i know") ~ "0.0",
-    allergy_count %in% c("mushroom", "1 (hayfever)", "cat", "grass", "i think 1") ~ "1.0",
-    allergy_count %in% c("dust, pollen") ~ "2.0",
-    allergy_count %in% c("at least 4") ~ "4.0",
-    allergy_count %in% c("5+") ~ "5.0",
-    TRUE ~ allergy_count,
-    TRUE ~ NA_character_  # Handle any unexpected cases
-  )) 
-
-sort(unique(x$allergy_count_clean))
-```
-
-### diet_style
-
-```{r}
-x$diet_style = tolower(x$diet_style)
-sort(unique(x$diet_style))   
-
-x <- x |>
-  mutate(diet_style_clean = case_when(
-    diet_style %in% c("carnivore", "everything") ~ "carnivore",
-    diet_style %in% c("omnivorous", "everything", "normal", "uh normal?") ~ "omnivorous",
-    diet_style %in% c("i dont do diet", "n/a", "na", "no beef", "none",
-                      "\"nothing bigger than a chicken\" i.e., no beef pork lamb or geese") ~ NA_character_,
-    diet_style %in% c("plant based") ~ "vegetarian",
-    TRUE ~ diet_style,
-    TRUE ~ NA_character_  # Handle any unexpected cases
-  ))
-
-sort(unique(x$diet_style_clean))
-```
-
-### favourite_letter
-
-```{r}
-x$favourite_letter = tolower(x$favourite_letter)
-sort(unique(x$favourite_letter)) 
-
-x <- x |>
-  mutate(favourite_letter_clean = case_when(
-    favourite_letter %in% c("?", "7.0", "hd", "na", "zzz.", "π", "none", "italicized") ~ NA_character_,
-    TRUE ~ favourite_letter,
-    TRUE ~ NA_character_  # Handle any unexpected cases
-  ))
-
-sort(unique(x$favourite_letter_clean))
-```
-
-```{r}
-library(dplyr)
-library(ggplot2)
-
-# Plot the distribution of the cleaned favourite_letter data
-ggplot(x, aes(x = favourite_letter_clean)) +
-  geom_bar(fill = "skyblue", color = "black") +
-  labs(title = "Distribution of Favourite Letters",
-       x = "Favourite Letter",
-       y = "Frequency") +
-  theme_minimal() +
-  theme(axis.text.x = element_text(angle = 90, hjust = 1))  # Rotate x-axis labels for readability
-
-```
-
-
-
-### drivers_license
-
-```{r}
-sort(unique(x$drivers_license))
-
-# Function to clean the drivers_license column
-clean_drivers_license <- function(license_str) {
-  # Handle NA values directly
-  if (is.na(license_str)) {
-    return(NA_character_)
-  }
-  
-  # Convert to lowercase for easier matching
-  license_str <- tolower(license_str)
-  
-  # Categorize as "Yes" if the response mentions China or "not in aus"
-  if (str_detect(license_str, "china|not in aus|Chinese")) {
-    return("Yes")
-  }
-  
-  # Categorize learner licenses
-  if (str_detect(license_str, "learner")) {
-    return("Learner License")
-  }
-  
-  # Standardize other responses
-  if (license_str %in% c("yes", "almost")) {
-    return("Yes")
-  } else if (license_str == "no" || str_detect(license_str, "no but i would like to have one")) {
-    return("No")
-  }
-  
-  # Default case: return NA for any other invalid inputs
-  return(NA_character_)
-}
-
-# Apply the cleaning function to the drivers_license column
-x <- x |> 
-  mutate(drivers_license_clean = sapply(drivers_license, clean_drivers_license))
-
-# Check the unique values after cleaning
-sort(unique(x$drivers_license_clean))
-
-```
-
-
-### relationship_status
-
-```{r}
-sort(unique(x$relationship_status))
-
-# Function to clean the relationship_status column
-clean_relationship_status <- function(status_str) {
-  # Handle NA values directly
-  if (is.na(status_str)) {
-    return(NA_character_)
-  }
-  
-  # Convert to lowercase for easier matching
-  status_str <- tolower(status_str)
-  
-  # Standardize positive relationship statuses
-  if (status_str %in% c("yes")) {
-    return("Yes")
-  }
-  
-  # Standardize negative relationship statuses
-  if (status_str %in% c("no", "no but i would like to have one, please")) {
-    return("No")
-  }
-  
-  # Handle ambiguous or unclear responses
-  if (status_str %in% c("not sure", "tears","i have 2", "multiple")) {
-    return("Unclear")
-  }
-  
-  # Default case: return NA for any other invalid inputs
-  return(NA_character_)
-}
-
-# Apply the cleaning function to the relationship_status column
-x <- x |> 
-  mutate(relationship_status_clean = sapply(relationship_status, clean_relationship_status))
-
-# Check the unique values after cleaning
-sort(unique(x$relationship_status_clean))
-
-```
-
-
-
-### daily_short_video_time
-
-```{r}
-sort(unique(x$daily_short_video_time))
-```
-
-```{r}
-# Function to clean and convert daily_short_video_time to numeric (hours)
-convert_video_time <- function(time_str) {
-  # Handle NA values directly
-  if (is.na(time_str)) {
-    return(NA_real_)
-  }
-  # Handle hours with minutes (e.g., "7 hours 15 mins.")
-  if (str_detect(sleep_str, "hours|hr") & str_detect(sleep_str, "min|m")) {
-    hours <- as.numeric(str_extract(sleep_str, "\\d+(?=\\s*hours)"))
-    mins <- as.numeric(str_extract(sleep_str, "\\d+(?=\\s*mins)"))
-    return(hours + mins / 60)
-  }
-  
-  # Convert to lowercase for easier matching
-  time_str <- tolower(time_str)
-  show(time_str)
-  if (str_detect(time_str, "min|mins|minutes")) {
-    # Extract the number of minutes and convert to hours
-    minutes <- as.numeric(str_extract(time_str, "\\d+"))
-    return(minutes / 60)
-  } 
-  else if (str_detect(time_str, "hour|hr|hrs")) {
-    # Handle ranges like "1-2 hours"
-    if (str_detect(time_str, "-|~")) {
-      numbers <- as.numeric(unlist(str_extract_all(time_str, "\\d+\\.?\\d*")))
-      return(mean(numbers))
-    } else {
-      # Extract the number of hours
-      hours <- as.numeric(str_extract(time_str, "\\d+\\.?\\d*"))
-      return(hours)
-    }
-}
-
-# Apply the cleaning function to the daily_short_video_time column
-x <- x |> 
-  mutate(daily_short_video_time_clean = sapply(daily_short_video_time, convert_video_time))
-
-# Check the unique values after cleaning
-unique(x$daily_short_video_time_clean)
-
-```
-
-
-
-
-### computer_os
-
-```{r}
-sort(unique(x$computer_os))
-
-convert_computer_os <- function(os_sys) {
-  # Handle NA values directly
-  if (is.na(os_sys)) {
-    return(NA_real_)
-  }
-  if (str_detect(os_sys, "Every macer need a windows")) {
-    return(NA_real_)
-  }
-  # Standardize the common text-based cases
-  os_sys <- case_when(
-    os_sys %in% c("both Mac and windows", "Both Windows and MacOS") ~ "MacOS, Windows",
-    os_sys %in% c("windows and wsl") ~ "Windows, Wsl",
-    TRUE ~ os_sys  # Keep the original value if it doesn't match the above cases
-  )
-}
-
-# Apply the cleaning function to the steak_preference column
-x <- x |> 
-  mutate(computer_os_clean = sapply(computer_os, convert_computer_os))
-length(x$computer_os_clean)
-sort(unique(x$computer_os_clean))
-
-# Plot the distribution of readable languages
-ggplot(x, aes(x = computer_os_clean)) +
-  geom_bar(fill = "skyblue", color = "black") +
-  labs(title = "..",
-       x = "Computer OS system",
-       y = "Frequency") +
-  theme_minimal() +
-  theme(axis.text.x = element_text())  # Rotate x-axis labels for readability
-
-```
-
-
-
-### steak_preference
-
-```{r}
-sort(unique(x$steak_preference))
-
-convert_steak_preference <- function(preference) {
-  # Handle NA values directly
-  if (is.na(preference)) {
-    return(NA_real_)
-  }
-  preference <- tolower(preference)
-  
-  if (str_detect(preference, "congratulation :>|i dont eat beef|i dont eat beef (see nothing > than a chicken q) but if i did for sure rare|just never had steak|i don't eat beef")) {
-    return(NA_real_)
-  }
-  return(preference)
-}
-
-# Apply the cleaning function to the steak_preference column
-x <- x |> 
-  mutate(steak_preference_clean = sapply(steak_preference, convert_steak_preference))
-
-# Check the unique values after cleaning
-sort(unique(x$steak_preference_clean))
-```
-
-### favourite_anime
-
-This is to much of a hassle 
-
-```{r}
-length(x$favourite_anime)
-sort(unique(x$favourite_anime))
-```
-
-### fluent_languages
-
-```{r}
-sort(unique(x$fluent_languages))
-```
-```{r}
-# Function to clean and convert readable_languages to numeric
-convert_languages <- function(language) {
-  # Handle NA values directly
-  if (is.na(language)) {
-    return(NA_real_)
-  }
-  
-  # Convert to lowercase for easier matching
-  language <- tolower(language)
-  
-  # Standardize the common text-based cases
-  language <- case_when(
-    language %in% c("1 (+ 3 programming)", "only english", "one") ~ "1",
-    language %in% c("40 with google", "many", "probably alot.... understanding them is another thing though") ~ "unclear",
-    language %in% c("English,Chinese", "two") ~ "2",
-    language %in% c("2.5(mandarin, english, and some japanese)") ~ "2.5",
-    TRUE ~ language  # Keep the original value if it doesn't match the above cases
-  )
-  
-  # Standardize numeric values and handle ranges
-  if (str_detect(language, "^\\d+\\.?\\d*$")) {
-    return(as.numeric(language))
-  }
-  
-  # Default case: return NA for any other invalid inputs
-  return(NA_real_)
-}
-
-# Apply the cleaning function to the readable_languages column
-x <- x |> 
-  mutate(fluent_languages_clean = sapply(fluent_languages, convert_languages))
-
-sort(unique(x$fluent_languages_clean))
-```
-
-```{r}
-# Plot the distribution of readable languages
-ggplot(x, aes(x = fluent_languages_clean)) +
-  geom_bar(fill = "skyblue", color = "black") +
-  labs(title = "Distribution of Fluent Languages",
-       x = "Number of Fluent Languages",
-       y = "Frequency") +
-  theme_minimal() +
-  scale_x_continuous(breaks = seq(min(x$fluent_languages_clean, na.rm = TRUE), max(x$fluent_languages_clean, na.rm = TRUE), by = 1)) +
-  theme(axis.text.x = element_text(angle = 90, hjust = 1))  # Rotate x-axis labels for readability
-```
-
-
-### readable_languages
-
-```{r}
-sort(unique(x$readable_languages))
-
-# Function to clean and convert readable_languages to numeric
-convert_languages <- function(language) {
-  # Handle NA values directly
-  if (is.na(language)) {
-    return(NA_real_)
-  }
-  
-  # Convert to lowercase for easier matching
-  language <- tolower(language)
-  
-  # Standardize the common text-based cases
-  language <- case_when(
-    language %in% c("i can only read english", "1 (fluently)", "one (+ ~5 programming)", "one") ~ "1",
-    language %in% c("40 with google", "many", "probably alot.... understanding them is another thing though") ~ "unclear",
-    language %in% c("english,chinese,japenese") ~ "3",
-    language %in% c("2-3") ~ "2.5",
-    TRUE ~ language  # Keep the original value if it doesn't match the above cases
-  )
-  
-  # Standardize numeric values and handle ranges
-  if (str_detect(language, "^\\d+\\.?\\d*$")) {
-    return(as.numeric(language))
-  }
-  
-  # Default case: return NA for any other invalid inputs
-  return(NA_real_)
-}
-
-# Apply the cleaning function to the readable_languages column
-x <- x |> 
-  mutate(readable_languages_clean = sapply(readable_languages, convert_languages))
-
-# Check the unique values after cleaning
-sort(unique(x$readable_languages_clean))
-length(x$readable_languages_clean)
-
-library(ggplot2)
-
-# Plot the distribution of readable languages
-ggplot(x, aes(x = readable_languages_clean)) +
-  geom_bar(fill = "skyblue", color = "black") +
-  labs(title = "Distribution of Readable Languages",
-       x = "Number of Readable Languages",
-       y = "Frequency") +
-  theme_minimal() +
-  scale_x_continuous(breaks = seq(min(x$readable_languages_clean, na.rm = TRUE), max(x$readable_languages_clean, na.rm = TRUE), by = 1)) +
-  theme(axis.text.x = element_text(angle = 90, hjust = 1))  # Rotate x-axis labels for readability
-```
-
-### country_of_birth
-
-```{r}
-sort(unique(x$country_of_birth))
-
-# Function to clean and standardize country of birth
-clean_country_of_birth <- function(country) {
-  # Handle NA values directly
-  if (is.na(country) || country %in% c("/", "2003.0", "Secondary", "A")) {
-    return(NA_character_)
-  }
-  
-  # Convert to lowercase and trim whitespace
-  country <- str_trim(tolower(country))
-  
-  # Standardize common variations
-  country <- case_when(
-    country %in% c("aus", "australia", "australia!", "au") ~ "Australia",
-    country %in% c("usa", "united states of america", "america") ~ "United States",
-    country %in% c("china", "chn") ~ "China",
-    country %in% c("south korea", "republic of korea") ~ "South Korea",
-    country %in% c("vietnam", "viet nam") ~ "Vietnam",
-    country %in% c("hk", "hong kong sar") ~ "Hong Kong",
-    country == "uk" ~ "United Kingdom",
-    TRUE ~ str_to_title(country)  # Convert the rest to title case
-  )
-  
-  return(country)
-}
-
-# Apply the cleaning function to the country_of_birth column
-x <- x |> 
-  mutate(country_of_birth_clean = sapply(country_of_birth, clean_country_of_birth))
-
-# Check the unique values after cleaning
-sort(unique(x$country_of_birth_clean))
-```
-```{r}
-# Plot the distribution of countries of birth as percentages
-ggplot(x, aes(x = country_of_birth_clean)) +
-  geom_bar(aes(y = (..count..) / sum(..count..) * 100), fill = "skyblue", color = "black") +
-  labs(title = "Distribution of Countries of Birth (Percentage)",
-       x = "Country of Birth",
-       y = "Percentage (%)") +
-  theme_minimal() +
-  theme(axis.text.x = element_text(angle = 90, hjust = 1))  # Rotate x-axis labels for readability
-```
-
-### wam
-
-```{r}
-x <- x |> 
-  mutate(wam_clean = round(x$wam, digits=0))
-
-unique(sort(x$wam_clean))
-
-ggplot(x, aes(x = wam_clean)) +
-  geom_bar(fill = "skyblue", color = "black") +
-  labs(title = "wam_clean",
-       x = "wam_clean",
-       y = "Frequency") +
-  theme_minimal() +
-  scale_x_continuous(breaks = seq(min(x$wam_clean, na.rm = TRUE), max(x$wam_clean, na.rm = TRUE), by = 5))  # Adjust breaks for better readability
-  #theme(axis.text.x = element_text(angle = 90, hjust = 1))  # Rotate x-axis labels if needed
-```
-
-### shoe_size
-
-```{r}
-# Assuming you have a data frame `df` with two columns: `foot_length_mm` and `eu_size`
-df <- data.frame(
-  foot_length_mm = c(220, 229, 237, 246, 254, 258, 262, 266, 271, 275, 279, 283, 288, 296, 305, 314),
-  eu_size = c(35.5, 37, 38, 39, 40.5, 41, 42, 42.5, 43, 44, 44.5, 45, 46, 47, 48, 49.5)
-)
-
-# Calculate the ratio of foot length to EU size
-df <- df |> 
-  mutate(ratio = foot_length_mm / eu_size)
-
-# Display the results
-mean(df$ratio)
-```
-
-```{r}
-# Function to convert shoe sizes if needed
-convert_shoe_size <- function(size) {
-  # Handle NA values directly
-  if (is.na(size)) {
-    return(NA_real_)
-  }
-  
-  # Convert foot length to E.U size (approximation)
-  if (size > 100) {
-    return(round(size / 6.4, digits = 0))
-  }
-  
-  # Return size directly if it's already in the correct format
-  return(size)
-}
-
-# Apply the conversion function to the shoe_size column
-x <- x |> 
-  mutate(shoe_size_clean = sapply(shoe_size, convert_shoe_size))
-
-# Check the unique values after cleaning
-sort(unique(x$shoe_size_clean))
-
-# Assuming `shoe_size` column is already cleaned and standardized
-ggplot(x, aes(x = shoe_size_clean)) +
-  geom_bar(fill = "skyblue", color = "black") +
-  labs(title = "Distribution of Shoe Sizes",
-       x = "Shoe Size",
-       y = "Frequency") +
-  theme_minimal() +
-  scale_x_continuous(breaks = seq(min(x$shoe_size, na.rm = TRUE), max(x$shoe_size, na.rm = TRUE), by = 1)) +  # Adjust breaks for better readability
-  theme(axis.text.x = element_text(angle = 90, hjust = 1))  # Rotate x-axis labels if needed
-```
-
 ## Cleaned Dataset
 
-Combine all the cleaned columns into a dataframe. 
+Initially I began cleaning all data until I realized only a whose used for the tests where supposed to be cleaned. I will go through the cleaning process of a selected handful of the features. In appendix the code for cleaning the rest of the features can be found. 
 
-```{r}
-cleaned_data <- x |> 
-  select(
-    timestamp,                   # org
-    target_grade,                # org
-    assignment_preference,       # org
-    trimester_or_semester_clean, # √
-    age_clean,                   # √
-    tendency_yes_or_no_clean,    # √  
-    pay_rent_clean,              # √
-    urinal_choice,               # org
-    stall_choice,                # org
-    weetbix_count,               # org
-    weekly_food_spend,           # org
-    living_arrangements,         # !!     1
-    weekly_alcohol,              # org
-    believe_in_aliens,           # org
-    height,                      # !!     2
-    commute,                     # !!     3
-    daily_anxiety_frequency,     # org
-    work_status,                 # org
-    weekly_study_hours,          # org
-    social_media_clean,          # √
-    gender_clean,                # √
-    average_daily_sleep_clean,   # √
-    usual_bedtime,               # !!     4
-    sleep_schedule,              # org
-    sibling_count_clean,         # √
-    allergy_count_clean,         # √
-    diet_style_clean,            # √
-    random_number,               # org
-    favourite_number,            # org
-    favourite_letter_clean,      # √
-    drivers_license_clean,       # √
-    relationship_status_clean,   # √
-    daily_short_video_time,      # !!     5
-    computer_os_clean,           # √
-    steak_preference_clean,      # √
-    dominant_hand,               # org
-    enrolled_unit,               # org
-    weekly_exercise_hours,       # org
-    weekly_paid_work_hours,      # org
-    assignments_on_time,         # org
-    used_r_before,               # org
-    team_role_type,              # org
-    university_year,             # org
-    favourite_anime,             # !!     6
-    fluent_languages_clean,      # √
-    readable_languages_clean,    # √
-    country_of_birth_clean,      # √
-    wam_clean,                   # √
-    shoe_size                    # !!     7
-  )
 
-# View the first few rows of the combined dataframe
-head(cleaned_data)
-```
+
+
+
+
+
+
+
+
+
 
 
 # Result
@@ -1211,7 +152,333 @@ There needs to be some variety in the types of tests you implement:
 - at least one test from module 2  
 - at least one test needs to be based on a resampling method (e.g. Monte Carlo or permutation test).
 
-# Discussion
+
+
+
+
+
+## Module 1
+
+### wk01
+
+
+**Chi-squared Goodness-of-fit Test**
+
+
+The only data about gender at Usyd was from 2021. Here the ratio between female and male is 57:43. Lets check if the proportions of gender enrolled in DATA2x02 follows the same distribution. 
+
+```{r}
+# 1. Create a new variable 'gender_new' that categorizes into 'female', 'male', and 'other'
+cleaned_data <- cleaned_data |> 
+  mutate(gender_new = case_when(
+    gender_clean == "Female" ~ "female",
+    gender_clean == "Male" ~ "male",
+    TRUE ~ "other"  # Assign 'other' to any remaining gender categories
+  ))
+unique(cleaned_data$gender_new)
+# 2. Calculate the observed distribution of gender in the dataset
+observed_gender <- table(cleaned_data$gender_new)
+observed_gender_df <- as.data.frame(observed_gender)
+observed_gender_df <- observed_gender_df |> 
+  mutate(proportion = round((Freq / sum(Freq)), digits = 3)) |>
+  mutate(exp_prop = c(female = 0.565, male = 0.425, other = 0.01))
+
+observed_gender_df
+
+# 4. Perform the Chi-squared Goodness-of-Fit test
+chisq.test(x = observed_gender, p = observed_gender_df$exp_prop)
+```
+
+Result: reject $H_0$
+
+
+**Two-sample $t$-test**
+
+```{r}
+# Two-Sample t-Test for independent samples
+# Assuming 'used_r_before' is a factor indicating if students have used R ("Yes" or "No")
+# and 'weekly_study_hours' is a numeric variable representing the number of study hours per week.
+
+# Subsetting the data into two groups based on the R usage
+group_r <- cleaned_data[cleaned_data$used_r_before == "Yes", ]
+group_no_r <- cleaned_data[cleaned_data$used_r_before == "No", ]
+
+# Performing the Two-Sample t-Test
+t_test_results <- t.test(group_r$weekly_study_hours, group_no_r$weekly_study_hours, var.equal = TRUE)
+t_test_results
+
+```
+
+Hypothesis: Are there differences in average daily sleep hours between males and females?
+```{r}
+# Subset male and female sleep hours
+male_sleep <- cleaned_data$average_daily_sleep_clean[cleaned_data$gender_clean == "Male"]
+female_sleep <- cleaned_data$average_daily_sleep_clean[cleaned_data$gender_clean == "Female"]
+
+# Conduct a two-sample t-test
+t_test_independent <- t.test(male_sleep, female_sleep, alternative = "two.sided")
+
+# Output the results
+print(t_test_independent)
+
+```
+
+
+$H_0 : \mu_1 = \mu_2$
+
+```{r}
+# Subset data for male and female
+study_hours_male <- cleaned_data$weekly_study_hours[cleaned_data$gender_clean == "Male"]
+study_hours_female <- cleaned_data$weekly_study_hours[cleaned_data$gender_clean == "Female"]
+
+# Run t-test 
+t.test(study_hours_male, study_hours_female, var.equal = TRUE)
+t.test(study_hours_male, study_hours_female, var.equal = FALSE)
+```
+Result:
+$t_0$ : A low t-value close to 0, such as 0.23476, indicates that the observed difference between the two group means is small.
+p-value : Don't reject $H_0$ 
+In this case, a p-value of 0.8146 is much greater than common significance levels (e.g., 0.05). This means there is no evidence to reject the null hypothesis. In other words, we fail to reject the null hypothesis that the mean study hours for males and females are equal.
+
+
+
+```{r}
+# Load necessary library
+library(ggplot2)
+
+# Creating histograms and Q-Q plots for each group within 'enrolled_unit'
+enrolled_units <- unique(cleaned_data$enrolled_unit)
+
+# Loop through each unique unit and plot
+plots_list <- lapply(enrolled_units, function(unit) {
+  data_subset <- subset(cleaned_data, enrolled_unit == unit)
+  
+  # Histogram
+  p1 <- ggplot(data_subset, aes(x = weekly_study_hours)) +
+    geom_histogram(bins = 15, fill = "blue", alpha = 0.7) +
+    ggtitle(paste("Histogram -", unit))
+  
+  # Q-Q Plot
+  p2 <- ggplot(data_subset, aes(sample = weekly_study_hours)) +
+    stat_qq() +
+    stat_qq_line(col = "red") +
+    ggtitle(paste("Q-Q Plot -", unit))
+  
+  list(Histogram = p1, QQPlot = p2)
+})
+
+# Conduct Shapiro-Wilk test for each group, ensuring adequate sample size
+shapiro_results <- sapply(enrolled_units, function(unit) {
+  data_subset <- subset(cleaned_data, enrolled_unit == unit)
+  
+  if (nrow(data_subset) >= 3 && nrow(data_subset) <= 5000) {
+    shapiro_test_result <- shapiro.test(data_subset$weekly_study_hours)$p.value
+  } else {
+    shapiro_test_result <- NA  # Assign NA if sample size is not within the valid range
+  }
+  
+  return(shapiro_test_result)
+})
+
+names(shapiro_results) <- enrolled_units
+
+# Return the list of plots and Shapiro-Wilk test results
+list(Plots = plots_list, Shapiro_Wilk_Test_Results = shapiro_results)
+
+```
+
+Hypothesis: Do students who submit assignments on time study more on average compared to those who don’t?
+```{r}
+# Two-Sample t-Test (assuming normal distribution)
+t.test(weekly_study_hours ~ enrolled_unit, data = cleaned_data)
+
+```
+normality check:
+
+
+```{r}
+# Wilcoxon Rank-Sum Test
+wilcox.test(weekly_study_hours ~ enrolled_unit, data = cleaned_data)
+```
+
+
+**Simple Linear Regression**
+Hypothesis: Does the number of weekly study hours predict the students' WAM (Weighted Average Mark)?
+Simple linear regression assesses if a predictor variable has a linear relationship with a response variable.
+
+```{r}
+# Simple Linear Regression to predict WAM based on weekly study hours
+lm_result <- lm(wam_clean ~ weekly_study_hours, data = cleaned_data)
+summary(lm_result)
+
+```
+
+
+**ANOVA (Analysis of Variance)**
+
+Avg exercise hours are the same for all countries
+
+```{r}
+# Perform ANOVA to compare sleep hours across relationship statuses
+anova_result <- aov(weekly_exercise_hours ~ target_grade, data = cleaned_data)
+
+# mean of e
+mean_exercise_by_grade <- cleaned_data %>%
+  group_by(target_grade) %>%
+  summarise(mean_exercise_hours = round(mean(weekly_exercise_hours, na.rm = TRUE), digits = 2))
+mean_exercise_by_grade
+
+# Perform ANOVA to check if there is a significant difference between the groups 
+anova_result <- aov(weekly_exercise_hours ~ target_grade, data = cleaned_data)
+summary(anova_result)
+```
+Results:
+
+- Residual Standard Error (= 52.49): This is the standard deviation of the residuals (within-group variation). It represents the average deviation of the observed weekly_exercise_hours from the predicted values.
+indicates that there is substantial variability in weekly exercise hours within each grade group. This could imply that target_grade may not be a strong predictor of weekly exercise habits.
+
+- Estimated Effects May Be Unbalanced: This message indicates that the group sizes for the different target_grade categories might not be equal, which can affect the precision of the ANOVA test.
+
+- $t_0$ : F-value: 0.242 - This is the test statistic calculated for this ANOVA test, which compares the variance between the groups to the variance within the groups.
+The small F-value suggests that the between-group variability (due to target_grade) is much smaller than the within-group variability (residuals).
+
+- p-value: $0.914 > 0.05$ - This indicates that there is no statistically significant difference in weekly_exercise_hours among the different target_grade groups. In other words, the null hypothesis that there are no differences among the groups cannot be rejected.
+
+**ANOVA (Analysis of Variance)**
+
+Hypothesis: Is there a difference in the average weekly study hours based on the year of university (first, second, third, etc.)?
+
+```{r}
+# ANOVA to test differences in weekly study hours across different university years
+anova_result <- aov(weekly_study_hours ~ university_year, data = cleaned_data)
+summary(anova_result)
+
+```
+
+
+Is there an association between gender (gender_clean) and social media preference (social_media_clean)?
+
+H0: There is no association between gender and social media preference.
+H1: There is an association between gender and social media preference.
+
+```{r}
+cleaned_data$social_media_clean <- as.factor(cleaned_data$social_media_clean)
+cleaned_data$average_daily_sleep_clean <- as.numeric(cleaned_data$average_daily_sleep_clean)
+
+# Convert social media platform variable to a factor
+cleaned_data$social_media_clean <- as.factor(cleaned_data$social_media_clean)
+
+# Perform ANOVA
+sleep_anova <- aov(average_daily_sleep_clean ~ social_media_clean, data = cleaned_data)
+
+
+# Check if ANOVA is significant, then proceed with Tukey HSD test
+# Assume we need to access the p-value from the summary output correctly
+summary(sleep_anova)
+
+# Pr(>F) = 0.718 > 0.05   => ANOVA not significant. Reject H0 
+```
+
+```{r}
+# Creating a list of plots for each social media platform
+plot_list <- lapply(levels(cleaned_data$social_media_clean), function(platform) {
+  data_subset <- cleaned_data[cleaned_data$social_media_clean == platform, ]
+  
+  # Histogram with overlaid normal curve
+  p1 <- ggplot(data_subset, aes(x = average_daily_sleep_clean)) +
+    geom_histogram(aes(y = ..density..), bins = 15, fill = "skyblue", color = "black") +
+    geom_density(color = "red") +
+    ggtitle(paste("Histogram for", platform))
+
+  # Q-Q plot
+  p2 <- ggplot(data_subset, aes(sample = average_daily_sleep_clean)) +
+    stat_qq() +
+    stat_qq_line() +
+    ggtitle(paste("Q-Q Plot for", platform))
+  
+  list(Histogram = p1, QQPlot = p2)
+})
+
+# Checking normality using Shapiro-Wilk test for each group
+shapiro_results <- sapply(levels(cleaned_data$social_media_clean), function(platform) {
+  data_subset <- cleaned_data[cleaned_data$social_media_clean == platform, ]
+  shapiro.test(data_subset$average_daily_sleep_clean)$p.value
+})
+
+names(shapiro_results) <- levels(cleaned_data$social_media_clean)
+
+# Output the results
+list(Plots = plot_list, Shapiro_Wilk_Test_Results = shapiro_results)
+
+```
+
+
+```{r}
+library(ggplot2)
+ggplot(cleaned_data, aes(x = social_media_clean, y = average_daily_sleep_clean, fill = social_media_clean)) +
+  geom_boxplot() +
+  labs(title = "Sleep Hours by Social Media Preference", x = "Social Media Preference", y = "Average Daily Sleep (hours)") +
+  theme_minimal()
+
+```
+
+
+
+**Chi-Square Test for Independence**
+
+### wk02
+
+**One-sample $t$-test**
+
+$H_0$ : $\mu = \mu_0$
+
+```{r}
+t.test(cleaned_data$age_clean, mu = 25)
+```
+
+Hypothesis: Do students sleep significantly more or less than the recommended 8 hours per day?
+```{r}
+# One-Sample t-Test (testing against 8 hours of sleep)
+t.test(cleaned_data$average_daily_sleep_clean, mu = 8)
+```
+
+
+
+**Chi-Square Test**
+for testing association between categorical variables
+```{r}
+# Chi-Square Test of Independence
+table_gender_living <- table(cleaned_data$gender_clean, cleaned_data$living_arrangements)
+chisq.test(table_gender_living)
+```
+
+
+
+• Test for Mean (One-Sample t-Test)
+```{r}
+# Perform a one-sample t-test on weekly study hours
+t.test(cleaned_data$weekly_study_hours, mu = 15, alternative = "two.sided")
+```
+
+• Test for Proportions (One-Sample Proportion Test)
+```{r}
+
+# Create a binary variable for gender_clean
+gender_pref <- cleaned_data$gender_clean == "Female"
+# Perform a one-sample proportion test
+prop_test_gender <- prop.test(sum(gender_pref, na.rm = TRUE), length(gender_pref), p = 0.5)
+print(prop_test_gender)
+
+```
+
+```{r}
+# Create a contingency table
+gender_rent_table <- table(cleaned_data$gender_clean, cleaned_data$pay_rent_clean)
+
+# Perform Chi-Square Test for independence
+chisq.test(gender_rent_table)
+
+```
 
 
 # Conclusion

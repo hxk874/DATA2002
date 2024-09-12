@@ -1,0 +1,1234 @@
+---
+title: "Cleaning"
+date: "2024-08-23"
+author: "Ellen Ebdrup"
+output: 
+  html_document: 
+    ### IMPORTANT ###
+    # self_contained: true # Creates a single HTML file as output
+    code_folding: show # Code folding; allows you to show/hide code chunks
+    ### USEFUL ###
+    code_download: true # Includes a menu to download the code file
+    ### OPTIONAL ###
+    df_print: paged # Sets how dataframes are automatically printed
+    theme: readable # Controls the font, colours, etc.
+    toc: true # (Useful) Creates a table of contents!
+    toc_float: true # table of contents at the side
+    number_sections: false # (Optional) Puts numbers next to heading/subheadings
+---
+
+Install packages
+```{r}
+# install.packages("devtools")
+library("devtools")
+# devtools::install_github("ropensci/gendercoder")
+```
+
+By Garth
+```{r}
+#| message: false
+library(tidyverse)
+library(dplyr)
+library(tidyr)
+library(stringr)
+library(gendercoder)
+library(ggplot2)
+library(janitor)
+library(hms)
+
+library(ggthemes) # Load theme_stata()
+theme_set(theme_gray())
+x = readxl::read_excel("data/DATA2x02_survey_2024_Responses.xlsx")
+```
+
+
+```{r}
+old_names = colnames(x)
+new_names = c(
+  "timestamp",
+  "target_grade",
+  "assignment_preference",
+  "trimester_or_semester",
+  "age",
+  "tendency_yes_or_no",
+  "pay_rent",
+  "urinal_choice",
+  "stall_choice",
+  "weetbix_count",
+  "weekly_food_spend",
+  "living_arrangements",
+  "weekly_alcohol",
+  "believe_in_aliens",
+  "height",
+  "commute",
+  "daily_anxiety_frequency",
+  "weekly_study_hours",
+  "work_status",
+  "social_media",
+  "gender",
+  "average_daily_sleep",
+  "usual_bedtime",
+  "sleep_schedule",
+  "sibling_count",
+  "allergy_count",
+  "diet_style",
+  "random_number",
+  "favourite_number",
+  "favourite_letter",
+  "drivers_license",
+  "relationship_status",
+  "daily_short_video_time",
+  "computer_os",
+  "steak_preference",
+  "dominant_hand",
+  "enrolled_unit",
+  "weekly_exercise_hours",
+  "weekly_paid_work_hours",
+  "assignments_on_time",
+  "used_r_before",
+  "team_role_type",
+  "university_year",
+  "favourite_anime",
+  "fluent_languages",
+  "readable_languages",
+  "country_of_birth",
+  "wam",
+  "shoe_size")
+# overwrite the old names with the new names:
+colnames(x) = new_names
+# combine old and new into a data frame:
+name_combo = bind_cols(New = new_names, Old = old_names)
+name_combo |> gt::gt()
+```
+## Demographic Information
+
+### age
+
+```{r}
+unique(sort(x$age))
+
+# Clean and convert the age column
+x <- x |> 
+  mutate(age_clean = case_when(
+    str_detect(age, "\\d+\\.*\\d*") ~ as.numeric(str_extract(age, "\\d+\\.*\\d*")),  # Extract numbers from the string
+    str_detect(age, "days") ~ as.numeric(str_extract(age, "\\d+")) / 365,  # Convert days to years
+    TRUE ~ NA_real_  # Handle any unexpected cases
+  )) |> 
+  mutate(age_clean = round(age_clean))  # Round to the nearest integer
+
+# Filter out unrealistic ages
+x <- x |> 
+  mutate(age_clean = ifelse(age_clean >= 10 & age_clean < 100, age_clean, NA_real_))
+
+sort(unique(x$age_clean))
+
+ggplot(x, aes(x = age_clean)) +
+  geom_bar(aes(y = (after_stat(count))/sum(after_stat(count))), fill = "skyblue", color = "black") +
+  scale_y_continuous(labels = scales::percent_format()) +
+  labs(title = "age_clean (Percentage)",
+       x = "Option",
+       y = "Percentage") +
+  scale_x_continuous(breaks = seq(min(x$age_clean, na.rm = TRUE), max(x$age_clean, na.rm = TRUE), by = 1)) +
+  theme_grey()
+```
+
+### gender
+
+```{r}
+x = x |> 
+  mutate(gender_clean = tolower(gender)) 
+
+sort(unique(x$gender_clean))
+```
+
+```{r}
+clean_gender <- function(gender_str) {
+  # Standardize male-related terms
+  if (gender_str %in% c("male", "m", "man", "boy", "cis male", "heterosexual male")) {
+    return("Male")
+  }
+  
+  # Standardize female-related terms
+  if (gender_str %in% c("female", "f", "woman", "girl", "femal", "biological female")) {
+    return("Female")
+  }
+  
+  if (gender_str %in% c("not female", "cisgender")) {
+    return("Other")
+  }
+  
+  # Default case (for any other values, return NA or the original value)
+  return(NA_character_)  # or return(gender_str) if you want to keep non-standard responses
+}
+
+x = x |> 
+  mutate(gender_clean = tolower(gender)) |>
+  mutate(gender_clean = sapply(gender_clean, clean_gender))
+
+sort(unique(x$gender_clean))
+
+x |> janitor::tabyl(
+  gender, gender_clean
+) |> gt::gt() |> 
+  gt::tab_spanner(label = "Recoded outcomes", columns = 2:5) |> 
+  gt::cols_label(gender = "Original outcomes")
+
+ggplot(x, aes(x = gender_clean)) +
+  geom_bar(aes(y = (after_stat(count))/sum(after_stat(count))), fill = "skyblue", color = "black") +
+  scale_y_continuous(labels = scales::percent_format()) +
+  labs(title = "Distribution of Gender After Cleaning (Percentage)",
+       x = "Gender",
+       y = "Percentage") +
+  theme_minimal()
+```
+
+### country_of_birth
+
+```{r}
+sort(unique(x$country_of_birth))
+
+# Function to clean and standardize country of birth
+clean_country_of_birth <- function(country) {
+  # Handle NA values directly
+  if (is.na(country) || country %in% c("/", "2003.0", "Secondary", "A")) {
+    return(NA_character_)
+  }
+  
+  # Convert to lowercase and trim whitespace
+  country <- str_trim(tolower(country))
+  
+  # Standardize common variations
+  country <- case_when(
+    country %in% c("aus", "australia", "australia!", "au") ~ "Australia",
+    country %in% c("usa", "united states of america", "america") ~ "United States",
+    country %in% c("china", "chn") ~ "China",
+    country %in% c("south korea", "republic of korea") ~ "South Korea",
+    country %in% c("vietnam", "viet nam") ~ "Vietnam",
+    country %in% c("hk", "hong kong sar") ~ "Hong Kong",
+    country == "uk" ~ "United Kingdom",
+    TRUE ~ str_to_title(country)  # Convert the rest to title case
+  )
+  
+  return(country)
+}
+
+# Apply the cleaning function to the country_of_birth column
+x <- x |> 
+  mutate(country_of_birth_clean = sapply(country_of_birth, clean_country_of_birth))
+
+# Check the unique values after cleaning
+sort(unique(x$country_of_birth_clean))
+
+ggplot() + 
+  aes(y = reorder(x$country_of_birth_clean, x$country_of_birth_clean, function(x) length(x))) + 
+  geom_bar() + 
+  labs(y = "", x = "Count") 
+
+# Plot the distribution of countries of birth as percentages
+ggplot(x, aes(x = country_of_birth_clean)) +
+  geom_bar(aes(y = (..count..) / sum(..count..) * 100), fill = "skyblue", color = "black") +
+  labs(title = "Distribution of Countries of Birth (Percentage)",
+       x = "Country of Birth",
+       y = "Percentage (%)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))  # Rotate x-axis labels for readability
+```
+
+### fluent_languages
+
+```{r}
+sort(unique(x$fluent_languages))
+
+# Function to clean and convert readable_languages to numeric
+convert_languages <- function(language) {
+  # Handle NA values directly
+  if (is.na(language)) {
+    return(NA_real_)
+  }
+  
+  # Convert to lowercase for easier matching
+  language <- tolower(language)
+  
+  # Standardize the common text-based cases
+  language <- case_when(
+    language %in% c("1 (+ 3 programming)", "only english", "one") ~ "1",
+    language %in% c("40 with google", "many", "probably alot.... understanding them is another thing though") ~ "unclear",
+    language %in% c("English,Chinese", "two") ~ "2",
+    language %in% c("2.5(mandarin, english, and some japanese)") ~ "2.5",
+    TRUE ~ language  # Keep the original value if it doesn't match the above cases
+  )
+  
+  # Standardize numeric values and handle ranges
+  if (str_detect(language, "^\\d+\\.?\\d*$")) {
+    return(as.numeric(language))
+  }
+  
+  # Default case: return NA for any other invalid inputs
+  return(NA_real_)
+}
+
+# Apply the cleaning function to the readable_languages column
+x <- x |> 
+  mutate(fluent_languages_clean = sapply(fluent_languages, convert_languages))
+
+sort(unique(x$fluent_languages_clean))
+
+ggplot(x, aes(x = fluent_languages_clean)) +
+  geom_bar(aes(y = (after_stat(count))/sum(after_stat(count))), fill = "skyblue", color = "black") +
+  scale_y_continuous(labels = scales::percent_format()) +
+  labs(title = "fluent_languages_clean (Percentage)",
+       x = "Option",
+       y = "Percentage") +
+  scale_x_continuous(breaks = seq(min(x$fluent_languages_clean, na.rm = TRUE), max(x$fluent_languages_clean, na.rm = TRUE), by = 1)) +
+  theme_grey()
+```
+
+### readable_languages
+
+```{r}
+sort(unique(x$readable_languages))
+
+# Function to clean and convert readable_languages to numeric
+convert_languages <- function(language) {
+  # Handle NA values directly
+  if (is.na(language)) {
+    return(NA_real_)
+  }
+  
+  # Convert to lowercase for easier matching
+  language <- tolower(language)
+  
+  # Standardize the common text-based cases
+  language <- case_when(
+    language %in% c("i can only read english", "1 (fluently)", "one (+ ~5 programming)", "one") ~ "1",
+    language %in% c("40 with google", "many", "probably alot.... understanding them is another thing though") ~ "unclear",
+    language %in% c("english,chinese,japenese") ~ "3",
+    language %in% c("2-3") ~ "2.5",
+    TRUE ~ language  # Keep the original value if it doesn't match the above cases
+  )
+  
+  # Standardize numeric values and handle ranges
+  if (str_detect(language, "^\\d+\\.?\\d*$")) {
+    return(as.numeric(language))
+  }
+  
+  # Default case: return NA for any other invalid inputs
+  return(NA_real_)
+}
+
+# Apply the cleaning function to the readable_languages column
+x <- x |> 
+  mutate(readable_languages_clean = sapply(readable_languages, convert_languages))
+
+# Check the unique values after cleaning
+sort(unique(x$readable_languages_clean))
+length(x$readable_languages_clean)
+
+ggplot(x, aes(x = readable_languages_clean)) +
+  geom_bar(aes(y = (after_stat(count))/sum(after_stat(count))), fill = "skyblue", color = "black") +
+  scale_y_continuous(labels = scales::percent_format()) +
+  labs(title = "readable_languages_clean (Percentage)",
+       x = "Option",
+       y = "Percentage") +
+  scale_x_continuous(breaks = seq(min(x$readable_languages_clean, na.rm = TRUE), max(x$readable_languages_clean, na.rm = TRUE), by = 1)) +
+  theme_grey()
+```
+
+
+
+
+## Academic Variables
+
+### university_year
+
+```{r}
+unique(sort(x$university_year))
+```
+
+```{r}
+x <- x |> mutate(university_year = factor(university_year, 
+                             levels = c("Fifth or higher year", 
+                                        "Fourth year", "Third year", 
+                                        "Second year", "First year", NA)))
+
+ggplot(x, aes(x = university_year)) +
+  geom_bar(aes(y = (after_stat(count))/sum(after_stat(count))), fill = "skyblue", color = "black") +
+  scale_y_continuous(labels = scales::percent_format()) +
+  labs(title = "university_year (%)",
+       x = "Option",
+       y = "%") +
+  theme_grey()
+```
+
+### enrolled_unit
+```{r}
+ggplot(x, aes(x = enrolled_unit)) +
+  geom_bar(aes(y = (after_stat(count))/sum(after_stat(count))), fill = "skyblue", color = "black") +
+  scale_y_continuous(labels = scales::percent_format()) +
+  labs(title = "enrolled_unit (Percentage)",
+       x = "Option",
+       y = "Percentage") +
+  theme_grey()
+```
+
+### trimester_or_semester
+
+```{r}
+unique(sort(x$trimester_or_semester))
+
+x <- x |> 
+  mutate(trimester_or_semester_clean = case_when(
+    trimester_or_semester %in% c("At my home university I have a 4 block system with to units at a time. I prefer that.", "Block structure where you have 4 main teaching session per year, and then only two courses at a time :)") ~ "Quadmester",
+    trimester_or_semester %in% c("Depends", "Nomester", "Not sure") ~ "No preference",
+    TRUE ~ trimester_or_semester,
+    TRUE ~ NA_character_  # Handle any unexpected cases
+  )) |>
+  mutate(trimester_or_semester_clean = factor(trimester_or_semester_clean, 
+                                              levels = c("Semester", "Trimester", "Quadmester", "No preference", NA)))
+
+# Check the unique values after cleaning
+sort(unique(x$trimester_or_semester_clean))
+
+ggplot(x, aes(x = trimester_or_semester_clean)) +
+  geom_bar(aes(y = (after_stat(count))/sum(after_stat(count))), fill = "skyblue", color = "black") +
+  scale_y_continuous(labels = scales::percent_format()) +
+  labs(title = "trimester_or_semester_clean (Percentage)",
+       x = "Option",
+       y = "Percentage") +
+  theme_grey()
+```
+
+### wam
+
+```{r}
+x <- x |> 
+  mutate(wam_clean = round(x$wam, digits=0))
+
+unique(sort(x$wam_clean))
+
+ggplot(x, aes(x = wam_clean)) +
+  geom_bar(fill = "skyblue", color = "black") +
+  labs(title = "wam_clean",
+       x = "wam_clean",
+       y = "Frequency") +
+  theme_minimal() +
+  scale_x_continuous(breaks = seq(min(x$wam_clean, na.rm = TRUE), max(x$wam_clean, na.rm = TRUE), by = 5))  # Adjust breaks for better readability
+  #theme(axis.text.x = element_text(angle = 90, hjust = 1))  # Rotate x-axis labels if needed
+```
+
+### target_grade
+
+
+
+```{r}
+ggplot(x, aes(x = target_grade)) +
+  geom_bar(aes(y = (after_stat(count))/sum(after_stat(count))), fill = "skyblue", color = "black") +
+  scale_y_continuous(labels = scales::percent_format()) +
+  labs(title = "target_grade (Perce%ntage)",
+       x = "Option",
+       y = "%") +
+  theme_grey()
+
+x <- x |> mutate(target_grade = factor(target_grade, 
+                             levels = c("High Distinction", "Distinction", "Credit", "Pass", "Fail", NA)))
+
+ggplot(x, aes(x = target_grade)) +
+  geom_bar(aes(y = (after_stat(count))/sum(after_stat(count))), fill = "skyblue", color = "black") +
+  scale_y_continuous(labels = scales::percent_format()) +
+  labs(title = "target_grade (Percentage)",
+       x = "Option",
+       y = "Percentage") +
+  theme_grey()
+```
+
+### weekly_study_hours
+
+```{r}
+sort(unique(x$weekly_study_hours))
+```
+
+
+
+```{r}
+ggplot(x, aes(x = weekly_study_hours)) +
+  geom_bar(aes(y = (after_stat(count))/sum(after_stat(count))), fill = "skyblue", color = "black") +
+  scale_y_continuous(labels = scales::percent_format()) +
+  labs(title = "weekly_study_hours (Percentage)",
+       x = "Option",
+       y = "Percentage") +
+  theme_grey()
+```
+
+
+### assignment_preference
+```{r}
+ggplot(x, aes(x = assignment_preference)) +
+  geom_bar(aes(y = (after_stat(count))/sum(after_stat(count))), fill = "skyblue", color = "black") +
+  scale_y_continuous(labels = scales::percent_format()) +
+  labs(title = "assignment_preference (Percentage)",
+       x = "Option",
+       y = "Percentage") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) + 
+  theme_grey()
+```
+
+### assignments_on_time
+```{r}
+ggplot(x, aes(x = assignments_on_time)) +
+  geom_bar(aes(y = (after_stat(count))/sum(after_stat(count))), fill = "skyblue", color = "black") +
+  scale_y_continuous(labels = scales::percent_format()) +
+  labs(title = "assignments_on_time (Percentage)",
+       x = "Option",
+       y = "Percentage") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) + 
+  theme_grey()
+```
+
+### used_r_before
+```{r}
+ggplot(x, aes(x = used_r_before)) +
+  geom_bar(aes(y = (after_stat(count))/sum(after_stat(count))), fill = "skyblue", color = "black") +
+  scale_y_continuous(labels = scales::percent_format()) +
+  labs(title = "used_r_before (Percentage)",
+       x = "Option",
+       y = "Percentage") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) + 
+  theme_grey()
+```
+
+
+### team_role_type
+```{r}
+ggplot(x, aes(x = team_role_type)) +
+  geom_bar(aes(y = (after_stat(count))/sum(after_stat(count))), fill = "skyblue", color = "black") +
+  scale_y_continuous(labels = scales::percent_format()) +
+  labs(title = "team_role_type (Percentage)",
+       x = "Option",
+       y = "Percentage") +
+  theme_minimal()
+```
+
+
+## Lfestyle and Living
+
+### pay_rent
+
+```{r}
+sort(unique(sort(x$pay_rent)))
+
+# Create the mapping for the pay_rent column
+x <- x |> 
+  mutate(pay_rent_clean = case_when(
+    pay_rent == "Yes" ~ "Yes",
+    pay_rent == "No" ~ "No",
+    pay_rent == "Mortgage" ~ "Mortgage",
+    pay_rent %in% c("I pay part of utilities", "pay for college (with external help)") ~ "Partly",
+    TRUE ~ NA_character_  # Handle any unexpected cases
+  )) |>
+  mutate(pay_rent_clean = factor(pay_rent_clean,
+                                 levels = c("Yes", "No", "Partly", "Mortgage", NA)))
+
+ggplot(x, aes(x = pay_rent_clean)) +
+  geom_bar(aes(y = (after_stat(count))/sum(after_stat(count))), fill = "skyblue", color = "black") +
+  scale_y_continuous(labels = scales::percent_format()) +
+  labs(title = "Pay rent? (Percentage)",
+       x = "Option",
+       y = "Percentage") +
+  theme_minimal()
+```
+
+### living_arrangements
+
+### work_status
+
+### weekly_paid_work_hours
+
+```{r}
+ggplot(x, aes(x = work_status)) +
+  geom_bar(aes(y = (after_stat(count))/sum(after_stat(count))), fill = "skyblue", color = "black") +
+  scale_y_continuous(labels = scales::percent_format()) +
+  labs(title = "weekly_paid_work_hours? (Percentage)",
+       x = "Option",
+       y = "Percentage") +
+  theme_minimal()
+```
+
+### weekly_exercise_hours
+
+### diet_style
+
+```{r}
+x$diet_style = tolower(x$diet_style)
+sort(unique(x$diet_style))   
+
+x <- x |>
+  mutate(diet_style_clean = case_when(
+    diet_style %in% c("carnivore", "everything") ~ "carnivore",
+    diet_style %in% c("omnivorous", "everything", "normal", "uh normal?") ~ "omnivorous",
+    diet_style %in% c("i dont do diet", "n/a", "na", "no beef", "none",
+                      "\"nothing bigger than a chicken\" i.e., no beef pork lamb or geese") ~ NA_character_,
+    diet_style %in% c("plant based") ~ "vegetarian",
+    TRUE ~ diet_style,
+    TRUE ~ NA_character_  # Handle any unexpected cases
+  ))
+
+sort(unique(x$diet_style_clean))
+
+ggplot() + 
+  aes(y = reorder(x$diet_style_clean, x$diet_style_clean, function(x) length(x))) + 
+  geom_bar() + 
+  labs(y = "", x = "Count") 
+```
+
+## Daily Habits
+
+### average_daily_sleep
+
+```{r}
+sort(unique(x$average_daily_sleep))
+
+# Function to clean and extract numeric values from the average_daily_sleep column
+clean_sleep <- function(sleep_str) {
+  # Convert to lowercase to handle variations in text
+  sleep_str <- tolower(sleep_str)
+  
+  # Handle NA values directly
+  if (is.na(sleep_str)) {
+    return(NA_real_)
+  }
+  
+  # Handle ranges like "4-5" or "8-10h"
+  if (str_detect(sleep_str, "[-~]")) {
+    #show(sleep_str)
+    numbers <- as.numeric(unlist(str_extract_all(sleep_str, "\\d+\\.?\\d*")))
+    #show(numbers)
+    return(mean(numbers))
+  }
+  
+  # Handle hours with minutes (e.g., "7 hours 15 mins.")
+  if (str_detect(sleep_str, "hours") & str_detect(sleep_str, "mins")) {
+    hours <- as.numeric(str_extract(sleep_str, "\\d+(?=\\s*hours)"))
+    mins <- as.numeric(str_extract(sleep_str, "\\d+(?=\\s*mins)"))
+    return(hours + mins / 60)
+  }
+  
+  # Handle minutes only (e.g., "440 minutes")
+  if (str_detect(sleep_str, "minutes")) {
+    minutes <- as.numeric(str_extract(sleep_str, "\\d+"))
+    return(minutes / 60)
+  }
+  # Handle cases with plain numeric values or hours (e.g., "8", "8h", "7 hours")
+  if (str_detect(sleep_str, "^\\d+\\.?\\d*$") | str_detect(sleep_str, "hours?|hrs?|h|hours")) {
+    return(as.numeric(str_extract(sleep_str, "\\d+\\.?\\d*")))
+  }
+  
+  # Handle non-numeric cases (e.g., "Enough", "sleep 10 hours a day")
+  if (str_detect(sleep_str, "enough|sleep")) {
+    return(NA_real_)
+  }
+  
+  # Default case: return NA if no other condition is met
+  return(NA_real_)
+}
+
+# Apply the cleaning function to the average_daily_sleep column
+x <- x |> 
+  mutate(average_daily_sleep_clean = sapply(average_daily_sleep, clean_sleep)) |> 
+  mutate(average_daily_sleep_clean = round(average_daily_sleep_clean, digits=1))
+
+# Check the unique values after cleaning
+length(x$average_daily_sleep_clean)
+length(x$average_daily_sleep)
+sort(unique(x$average_daily_sleep_clean))
+```
+
+
+
+
+```{r}
+ggplot(x, aes(x = average_daily_sleep_clean)) +
+  geom_histogram(binwidth = 0.5, fill = "skyblue", color = "black") +
+  labs(title = "Distribution of Average Daily Sleep",
+       x = "Average Daily Sleep (Hours)",
+       y = "Count") +
+  theme_minimal() +
+  
+  scale_x_continuous(breaks = seq(0, 12, 1))  # Adjust the x-axis for better readability
+
+# Plot the histogram of the cleaned data as percentages
+ggplot(x, aes(x = average_daily_sleep_clean)) +
+  geom_histogram(aes(y = (..count..)/sum(..count..) * 100), 
+                 binwidth = 0.5, fill = "skyblue", color = "black") +
+  labs(title = "Distribution of Average Daily Sleep",
+       x = "Average Daily Sleep (Hours)",
+       y = "Percentage (%)") +
+  theme_minimal() +
+  scale_x_continuous(breaks = seq(0, 12, 1)) +  # Adjust the x-axis for better readability
+  scale_y_continuous(labels = scales::percent_format(scale = 1))
+
+
+
+```
+
+
+
+```{r}
+# Plot the histogram with a normal curve
+x <- x |> 
+  filter(average_daily_sleep_clean != 1.0)
+
+ggplot(x, aes(x = average_daily_sleep_clean)) +
+  geom_histogram(aes(y = ..density..), binwidth = 0.5, fill = "skyblue", color = "black") +
+  stat_function(fun = dnorm, args = list(mean = mean(x$average_daily_sleep_clean, na.rm = TRUE),
+                                         sd = sd(x$average_daily_sleep_clean, na.rm = TRUE)),
+                color = "red", linewidth = 1) +
+  labs(title = "Distribution of Average Daily Sleep with Normal Curve",
+       x = "Average Daily Sleep (Hours)",
+       y = "Density") +
+  theme_minimal() +
+  scale_x_continuous(breaks = seq(0, 12, 1))  # Adjust the x-axis for better readability
+
+```
+
+### tendency_yes_or_no
+
+```{r}
+sort(unique(x$tendency_yes_or_no))
+x <- x |> 
+  mutate(tendency_yes_or_no_clean = case_when(
+    tendency_yes_or_no %in% c("More \"Yes\"") ~ "More yes",
+    tendency_yes_or_no %in% c("More \"No\"") ~ "More no",
+    TRUE ~ NA_character_  # Handle any unexpected cases
+  ))
+
+ggplot(x, aes(x = tendency_yes_or_no_clean)) +
+  geom_bar(aes(y = (after_stat(count))/sum(after_stat(count))), fill = "skyblue", color = "black") +
+  scale_y_continuous(labels = scales::percent_format()) +
+  labs(title = "tendency_yes_or_no_clean (Percentage)",
+       x = "Option",
+       y = "Percentage") +
+  theme_minimal()
+```
+
+
+### urinal_choice, stall_choice
+
+```{r}
+# urinal_choice
+ggplot(x, aes(x = urinal_choice)) +
+  geom_bar(aes(y = (after_stat(count))/sum(after_stat(count))), fill = "skyblue", color = "black") +
+  scale_y_continuous(labels = scales::percent_format()) +
+  labs(title = "urinal_choice (Percentage)",
+       x = "Option",
+       y = "Percentage") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) + 
+  theme_grey()
+
+# stall_choice
+ggplot(x, aes(x = stall_choice)) +
+  geom_bar(aes(y = (after_stat(count))/sum(after_stat(count))), fill = "skyblue", color = "black") +
+  scale_y_continuous(labels = scales::percent_format()) +
+  labs(title = "stall_choice (Percentage)",
+       x = "Option",
+       y = "Percentage") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) + 
+  theme_grey()
+```
+
+
+### weetbix_count, weekly_food_spend
+
+
+```{r}
+# weetbix_count
+ggplot(x, aes(x = weetbix_count)) +
+  geom_bar(aes(y = (after_stat(count))/sum(after_stat(count))), fill = "skyblue", color = "black") +
+  scale_y_continuous(labels = scales::percent_format()) +
+  labs(title = "weetbix_count (Percentage)",
+       x = "Option",
+       y = "Percentage") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) + 
+  theme_grey()
+
+# weekly_food_spend
+ggplot(x, aes(x = weekly_food_spend)) +
+  geom_bar(aes(y = (after_stat(count))/sum(after_stat(count))), fill = "skyblue", color = "black") +
+  scale_y_continuous(labels = scales::percent_format()) +
+  labs(title = "weekly_food_spend (Percentage)",
+       x = "Option",
+       y = "Percentage") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) + 
+  theme_grey()
+```
+
+### weekly_alcohol
+
+```{r}
+sort(unique(x$weekly_alcohol))
+```
+
+
+```{r}
+x <- x |> 
+  mutate(weekly_alcohol_clean = case_when(
+    weekly_alcohol %in% c("More than 20 standard drinks") ~ ">20",
+    weekly_alcohol %in% c("Between 15 and 20 standard drinks") ~ "15-20",
+    weekly_alcohol %in% c("Between 10 and 15 standard drinks") ~ "10-15",
+    weekly_alcohol %in% c("Between 5 and 10 standard drinks") ~ "5-10",
+    weekly_alcohol %in% c("Less than 5 standard drinks") ~ "<5",
+    weekly_alcohol %in% c("I don't drink alcohol") ~ "0",
+    TRUE ~ NA_character_  # Handle any unexpected cases
+  ))
+sort(unique(x$weekly_alcohol_clean))
+x <- x |> mutate(weekly_alcohol_clean = factor(weekly_alcohol_clean, 
+                             levels = c(">20", 
+                                        "15-20",
+                                        "10-15",
+                                        "5-10",
+                                        "<5",
+                                        "0",
+                                        NA)))
+
+# weekly_food_spend
+ggplot(x, aes(x = weekly_alcohol_clean)) +
+  geom_bar(aes(y = (after_stat(count))/sum(after_stat(count))), fill = "skyblue", color = "black") +
+  scale_y_continuous(labels = scales::percent_format()) +
+  labs(title = "weekly_alcohol_clean",
+       x = "Option",
+       y = "%") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 0.5)) + 
+  theme_grey()
+
+ggplot() + 
+  aes(y = reorder(x$weekly_alcohol_clean, x$weekly_alcohol_clean, function(x) length(x))) + 
+  geom_bar() + 
+  labs(y = "", x = "Count") 
+
+
+
+```
+
+
+### commute
+
+```{r}
+ggplot() + 
+  aes(y = reorder(x$commute, x$commute, function(x) length(x))) + 
+  geom_bar() + 
+  labs(y = "", x = "Count") 
+```
+
+### social_media
+
+```{r}
+x |> janitor::tabyl(social_media) |> 
+  gt::gt() |> 
+  gt::fmt_percent(columns = 3:4, decimals = 1) |> 
+  gt::cols_label(social_media = "Favourite social media platform")
+```
+
+
+```{r}
+x= x |> mutate(
+  social_media_clean = tolower(social_media),
+  social_media_clean = str_replace_all(social_media_clean, '[[:punct:]]',' '),
+  social_media_clean = stringr::word(social_media_clean),
+  social_media_clean = case_when(
+    stringr::str_starts(social_media_clean,"in") ~ "instagram",
+    stringr::str_starts(social_media_clean,"ig") ~ "instagram",
+    stringr::str_starts(social_media_clean,"tik") ~ "tiktok",
+    stringr::str_starts(social_media_clean,"we") ~ "wechat",
+    stringr::str_starts(social_media_clean,"twi") ~ "twitter",
+    stringr::str_starts(social_media_clean,"x") ~ "twitter",
+    stringr::str_starts(social_media_clean,"mess") ~ "facebook",
+    stringr::str_starts(social_media_clean,"bil") ~ "bilibili",
+    is.na(social_media_clean) ~ "none",
+    TRUE ~ social_media_clean
+  ),
+  social_media_clean = tools::toTitleCase(social_media_clean),
+  social_media_clean = forcats::fct_lump_min(social_media_clean, min = 10)
+)
+```
+
+
+```{r}
+x |> janitor::tabyl(social_media_clean) |> 
+  arrange(desc(n)) |> 
+  gt::gt() |> 
+  gt::fmt_percent(columns = 3, decimals = 1) |> 
+  gt::cols_label(social_media_clean = "Favourite social media platform") |> 
+  gt::cols_align(align = "left", columns = 1)
+```
+```{r}
+sort(unique(x$social_media_clean))
+ggplot(x, aes(x = social_media_clean)) +
+  geom_bar(aes(y = (after_stat(count))/sum(after_stat(count))), fill = "skyblue", color = "black") +
+  scale_y_continuous(labels = scales::percent_format()) +
+  labs(title = "social_media_clean (Percentage)",
+       x = "Option",
+       y = "Percentage") +
+  theme_minimal()
+```
+
+
+
+
+### sibling_count
+
+```{r}
+unique(sort(x$sibling_count))
+
+x <- x |> 
+  mutate(sibling_count_clean = case_when(
+    sibling_count %in% c("no", "none") ~ "0.0",
+    sibling_count %in% c("I have 2 siblings", "2 and my dog :)") ~ "2.0",
+    sibling_count %in% c("one", "One") ~ "1.0",
+    sibling_count %in% c("many", "Too many", "bicycle") ~ NA_character_,
+    TRUE ~ sibling_count,
+    TRUE ~ NA_character_  # Handle any unexpected cases
+  )) 
+
+x <- x |> mutate(sibling_count_clean = as.integer(sibling_count_clean))
+length(x$sibling_count_clean) # 305
+
+ggplot(x, aes(x = sibling_count_clean)) +
+  geom_bar(aes(y = (after_stat(count))/sum(after_stat(count))), fill = "skyblue", color = "black") +
+  scale_y_continuous(labels = scales::percent_format()) +
+  labs(title = "sibling_count_clean (Percentage)",
+       x = "Option",
+       y = "Percentage") +
+  scale_x_continuous(breaks = seq(min(x$sibling_count_clean, na.rm = TRUE), max(x$sibling_count_clean, na.rm = TRUE), by = 1)) +
+  theme_grey()
+```
+
+### allergy_count
+
+```{r}
+x$allergy_count = tolower(x$allergy_count)
+
+unique(sort(x$allergy_count))   
+
+x <- x |>
+  mutate(allergy_count_clean = case_when(
+    allergy_count %in% c("don't know", "i don't know", "0~1.5", "n/a") ~ NA_character_,
+    allergy_count %in% c("zero", "no", "none", "i have no allergies","not that i know") ~ "0.0",
+    allergy_count %in% c("mushroom", "1 (hayfever)", "cat", "grass", "i think 1") ~ "1.0",
+    allergy_count %in% c("dust, pollen") ~ "2.0",
+    allergy_count %in% c("at least 4") ~ "4.0",
+    allergy_count %in% c("5+") ~ "5.0",
+    TRUE ~ allergy_count,
+    TRUE ~ NA_character_  # Handle any unexpected cases
+  )) 
+
+sort(unique(x$allergy_count_clean))
+
+x <- x |> mutate(allergy_count_clean = as.integer(allergy_count_clean))
+length(x$allergy_count_clean) # 305
+
+ggplot(x, aes(x = allergy_count_clean)) +
+  geom_bar(aes(y = (after_stat(count))/sum(after_stat(count))), fill = "skyblue", color = "black") +
+  scale_y_continuous(labels = scales::percent_format()) +
+  labs(title = "allergy_count_clean (Percentage)",
+       x = "Option",
+       y = "Percentage") +
+  scale_x_continuous(breaks = seq(min(x$allergy_count_clean, na.rm = TRUE), max(x$allergy_count_clean, na.rm = TRUE), by = 1)) +
+  theme_grey()
+
+```
+
+
+
+### favourite_letter
+
+```{r}
+x$favourite_letter = tolower(x$favourite_letter)
+sort(unique(x$favourite_letter)) 
+
+x <- x |>
+  mutate(favourite_letter_clean = case_when(
+    favourite_letter %in% c("?", "7.0", "hd", "na", "zzz.", "π", "none", "italicized") ~ NA_character_,
+    TRUE ~ favourite_letter,
+    TRUE ~ NA_character_  # Handle any unexpected cases
+  ))
+
+sort(unique(x$favourite_letter_clean))
+
+ggplot() + 
+  aes(y = reorder(x$favourite_letter_clean, x$favourite_letter_clean, function(x) length(x))) + 
+  geom_bar() + 
+  labs(y = "", x = "Count") 
+
+total_count <- sum(!is.na(x$favourite_letter_clean))
+
+# Plot the distribution of the cleaned favourite_letter data
+ggplot(x, aes(x = favourite_letter_clean)) +
+  geom_bar(aes(y = (..count..) / total_count * 100), fill = "skyblue", color = "black") +
+  labs(title = "Distribution of Favourite Letters",
+       x = "Favourite Letter",
+       y = "Perceeentage (%)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 0, hjust = 1))  # Rotate x-axis labels for readability
+```
+
+### drivers_license
+
+```{r}
+sort(unique(x$drivers_license))
+
+# Function to clean the drivers_license column
+clean_drivers_license <- function(license_str) {
+  # Handle NA values directly
+  if (is.na(license_str)) {
+    return(NA_character_)
+  }
+  
+  # Convert to lowercase for easier matching
+  license_str <- tolower(license_str)
+  
+  # Categorize as "Yes" if the response mentions China or "not in aus"
+  if (str_detect(license_str, "china|not in aus|Chinese")) {
+    return("Yes")
+  }
+  
+  # Categorize learner licenses
+  if (str_detect(license_str, "learner")) {
+    return("Learner License")
+  }
+  
+  # Standardize other responses
+  if (license_str %in% c("yes", "almost")) {
+    return("Yes")
+  } else if (license_str == "no" || str_detect(license_str, "no but i would like to have one")) {
+    return("No")
+  }
+  
+  # Default case: return NA for any other invalid inputs
+  return(NA_character_)
+}
+
+# Apply the cleaning function to the drivers_license column
+x <- x |> 
+  mutate(drivers_license_clean = sapply(drivers_license, clean_drivers_license))
+
+# Check the unique values after cleaning
+sort(unique(x$drivers_license_clean))
+
+ggplot(x, aes(x = drivers_license_clean)) +
+  geom_bar(aes(y = (after_stat(count))/sum(after_stat(count))), fill = "skyblue", color = "black") +
+  scale_y_continuous(labels = scales::percent_format()) +
+  labs(title = "drivers_license_clean (Percentage)",
+       x = "Option",
+       y = "Percentage") +
+  theme_minimal()
+```
+
+
+### relationship_status
+
+```{r}
+sort(unique(x$relationship_status))
+
+# Function to clean the relationship_status column
+clean_relationship_status <- function(status_str) {
+  # Handle NA values directly
+  if (is.na(status_str)) {
+    return(NA_character_)
+  }
+  
+  # Convert to lowercase for easier matching
+  status_str <- tolower(status_str)
+  
+  # Standardize positive relationship statuses
+  if (status_str %in% c("yes")) {
+    return("Yes")
+  }
+  
+  # Standardize negative relationship statuses
+  if (status_str %in% c("no", "no but i would like to have one, please")) {
+    return("No")
+  }
+  
+  # Handle ambiguous or unclear responses
+  if (status_str %in% c("not sure", "tears","i have 2", "multiple")) {
+    return("Unclear")
+  }
+  
+  # Default case: return NA for any other invalid inputs
+  return(NA_character_)
+}
+
+# Apply the cleaning function to the relationship_status column
+x <- x |> 
+  mutate(relationship_status_clean = sapply(relationship_status, clean_relationship_status))
+
+# Check the unique values after cleaning
+sort(unique(x$relationship_status_clean))
+
+ggplot(x, aes(x = relationship_status_clean)) +
+  geom_bar(aes(y = (after_stat(count))/sum(after_stat(count))), fill = "skyblue", color = "black") +
+  scale_y_continuous(labels = scales::percent_format()) +
+  labs(title = "relationship_status_clean (Percentage)",
+       x = "Option",
+       y = "Percentage") +
+  theme_grey()
+```
+
+### computer_os
+
+```{r}
+sort(unique(x$computer_os))
+
+convert_computer_os <- function(os_sys) {
+  # Handle NA values directly
+  if (is.na(os_sys)) {
+    return(NA_real_)
+  }
+  if (str_detect(os_sys, "Every macer need a windows")) {
+    return(NA_real_)
+  }
+  # Standardize the common text-based cases
+  os_sys <- case_when(
+    os_sys %in% c("both Mac and windows", "Both Windows and MacOS") ~ "MacOS, Windows",
+    os_sys %in% c("windows and wsl") ~ "Windows, Wsl",
+    TRUE ~ os_sys  # Keep the original value if it doesn't match the above cases
+  )
+}
+
+# Apply the cleaning function to the steak_preference column
+x <- x |> 
+  mutate(computer_os_clean = sapply(computer_os, convert_computer_os))
+length(x$computer_os_clean)
+sort(unique(x$computer_os_clean))
+
+total_count <- sum(!is.na(x$computer_os_clean))
+# Plot the distribution of readable languages
+ggplot(x, aes(x = computer_os_clean)) +
+  geom_bar(aes(y = (..count..) / total_count * 100), fill = "skyblue", color = "black") +
+  labs(title = "..",
+       x = "Computer OS system",
+       y = "Frequency (%)") +
+  theme_grey() +
+  theme(axis.text.x = element_text())  # Rotate x-axis labels for readability
+
+```
+
+### steak_preference
+
+```{r}
+sort(unique(x$steak_preference))
+
+convert_steak_preference <- function(preference) {
+  # Handle NA values directly
+  if (is.na(preference)) {
+    return(NA_real_)
+  }
+  preference <- tolower(preference)
+  
+  if (str_detect(preference, "congratulation :>|i dont eat beef|i dont eat beef (see nothing > than a chicken q) but if i did for sure rare|just never had steak|i don't eat beef")) {
+    return(NA_real_)
+  }
+  return(preference)
+}
+
+# Apply the cleaning function to the steak_preference column
+x <- x |> 
+  mutate(steak_preference_clean = sapply(steak_preference, convert_steak_preference))
+
+# Check the unique values after cleaning
+sort(unique(x$steak_preference_clean))
+
+ggplot(x, aes(x = steak_preference_clean)) +
+  geom_bar(aes(y = (after_stat(count))/sum(after_stat(count))), fill = "skyblue", color = "black") +
+  scale_y_continuous(labels = scales::percent_format()) +
+  labs(title = "steak_preference_clean (Percentage)",
+       x = "Option",
+       y = "Percentage") +
+  theme_grey()
+```
+
+
+
+```{r}
+x_col <- x$wam_clean
+
+ggplot(x, aes(x = x_col)) +
+  geom_bar(aes(y = (after_stat(count))/sum(after_stat(count))), fill = "skyblue", color = "black") +
+  scale_y_continuous(labels = scales::percent_format()) +
+  labs(title = "Column",
+       x = "Option",
+       y = "%") +
+  theme_grey()
+```
+
+
+## Cleaned Dataset
+
+Combine all the cleaned columns into a dataframe. 
+
+```{r}
+cleaned_data <- x |> 
+  select(
+    # Demographic Information
+    age_clean,                 
+    gender_clean,              
+    country_of_birth_clean,   
+    fluent_languages_clean,   
+    readable_languages_clean,  
+    
+    # Academic Variables
+    target_grade,                
+    assignment_preference,       
+    trimester_or_semester_clean, 
+    university_year,             
+    enrolled_unit,             
+    weekly_study_hours,    
+    assignments_on_time,         
+    used_r_before,             
+    wam_clean,            
+    team_role_type,   
+    
+    # Lifestyle and Living
+    pay_rent_clean,            
+    living_arrangements,  
+    work_status,            
+    weekly_paid_work_hours,     
+    weekly_exercise_hours,     
+    diet_style_clean,  
+    
+    # Daily Habits
+    average_daily_sleep_clean,   
+    sleep_schedule,            
+    weekly_food_spend,          
+    weekly_alcohol_clean,         
+    daily_anxiety_frequency,   
+    social_media_clean,             
+    relationship_status_clean,   
+    drivers_license_clean,       
+   
+    # Behavioral and Preference Variables
+    sibling_count_clean,        
+    allergy_count_clean,        
+    steak_preference_clean,     
+    dominant_hand,
+    computer_os_clean,
+   
+    # Other Variabless
+    believe_in_aliens,        
+    random_number,              
+    favourite_number,            
+    favourite_letter_clean,      
+    urinal_choice,               
+    stall_choice,               
+    weetbix_count
+  )
+
+
+write.csv(cleaned_data, "data/cleaned_survey_data.csv", row.names = FALSE)
+
+# View the first few rows of the combined dataframe
+head(cleaned_data)
+
+```
+
+
+

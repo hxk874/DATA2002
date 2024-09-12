@@ -37,7 +37,8 @@ You'll see the YAML references a bibliography file \`report.bib\` which can be d
 :::
 
 ```{r}
-#| message: false library(tidyverse) library(gendercoder) library(janitor) library(hms) theme_set(theme_bw()) x = readxl::read_excel("data/DATA2x02_survey_2024_Responses.xlsx") 
+#| message: false library(tidyverse) library(gendercoder) library(janitor) library(hms) theme_set(theme_bw()) 
+#| x = readxl::read_excel("data/DATA2x02_survey_2024_Responses.xlsx") 
 
 ```
 

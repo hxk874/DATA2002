@@ -1,0 +1,730 @@
+---
+title: "DATA2x02 Assignment"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+author: "540940662"
+institute: "The University of Sydney"
+format: 
+  html:
+    code-tools: true
+    code-fold: show
+    embed-resources: true
+    fig_caption: true
+    code-line-numbers: true # Line numbers in code chunks
+    df-print: paged # Sets how dataframes are automatically printed
+    # theme: lux # Controls the font, colours, etc.
+
+table-of-contents: true # (Useful) Creates a table of contents!
+number-sections: true # (Optional) Puts numbers next to heading/subheadings
+
+execute:
+  warning: false
+bibliography: [refs/bibliography.bibtex, refs/packages.bib]
+---
+
+
+```{r}
+#| message: false
+library(tidyverse)
+library(dplyr)
+library(stringr)
+library(gendercoder)
+library(ggplot2)
+library(scales)
+library(janitor)
+library(hms)
+library(ggthemes) 
+library(infer)
+theme_set(theme_grey())
+
+# creates a file with the bibtex for packages used:
+knitr::write_bib(c(.packages(),
+                   "knitr", "rmarkdown"), "refs/packages.bib")
+
+# data 
+x = readxl::read_excel("data/DATA2x02_survey_2024_Responses.xlsx")
+```
+
+
+# Introduction
+
+This assignment is for the unit "DATA2x02: Data Analytics: Learning from Data". It evolves around a survey taken by the students enrolled in the units DATA2002 and DATA2902. The original results can be found via this [link](https://docs.google.com/spreadsheets/d/1CR33C_oUu2QqbKWshnk5pP_-wwRIx8z9RCtWN7cVVWw/pub?output=xlsx) [@data2002survey]. 
+
+First, the data is analysed and cleaned. Then specific survey variables will be used to perform statistical hypothesis tests. Lastly, we will try to interpret the results of the tests to see if there is a connection between between the tested variables. 
+
+
+
+## Initial Data Exploration
+
+We begin by changing the column names assigned to each survey 
+
+The provided new column names from (@tarr2024) is used in the report. 
+
+```{r}
+old_names = colnames(x) # old column names
+
+new_names = c(
+  "timestamp",
+  "target_grade",
+  "assignment_preference",
+  "trimester_or_semester",
+  "age",
+  "tendency_yes_or_no",
+  "pay_rent",
+  "urinal_choice",
+  "stall_choice",
+  "weetbix_count",
+  "weekly_food_spend",
+  "living_arrangements",
+  "weekly_alcohol",
+  "believe_in_aliens",
+  "height",
+  "commute",
+  "daily_anxiety_frequency",
+  "weekly_study_hours",
+  "work_status",
+  "social_media",
+  "gender",
+  "average_daily_sleep",
+  "usual_bedtime",
+  "sleep_schedule",
+  "sibling_count",
+  "allergy_count",
+  "diet_style",
+  "random_number",
+  "favourite_number",
+  "favourite_letter",
+  "drivers_license",
+  "relationship_status",
+  "daily_short_video_time",
+  "computer_os",
+  "steak_preference",
+  "dominant_hand",
+  "enrolled_unit",
+  "weekly_exercise_hours",
+  "weekly_paid_work_hours",
+  "assignments_on_time",
+  "used_r_before",
+  "team_role_type",
+  "university_year",
+  "favourite_anime",
+  "fluent_languages",
+  "readable_languages",
+  "country_of_birth",
+  "wam",
+  "shoe_size")
+# overwrite the old names with the new names:
+colnames(x) = new_names
+# combine old and new into a data frame:
+name_combo = bind_cols(New = new_names, Old = old_names)
+name_combo |> gt::gt()
+```
+
+## The survey
+
+The survey is taken by 313 students from the units DATA2002 and DATA2902, 252 and 58 students respectively (with 3 students not specifying their unit) - corresponding to around 37% and 69% respectively which suggest that there was an uneven participation rate between the two groups. This distribution is visualized on @fig-uni_year_units below.
+
+The sample of participated student is not a random sample since it a) does represents random cross-section of all DATA2X02 students - hence the 37% and 69% participation percentage and b) the participation was optional, which leads potentials bias. 
+
+
+```{r}
+#| label: fig-uni_year_units
+#| fig-cap: "Distribution among the participated students from the DATA2x02 units. Notice that 3 second year student didn't specify thier unit. The total number of participated students is 313."
+
+# Create a bar plot
+x$university_year <- factor(x$university_year,
+                            levels = c("First year", "Second year", "Third year","Fourth year", "Fifth or higher year"),
+                            exclude = NULL)  # This includes NA in the factor levels, treated as an additional level
+
+x$enrolled_unit <- factor(x$enrolled_unit,
+                          levels = c("DATA2002", "DATA2902"),
+                          exclude = NULL)  # This includes NA in the factor levels, treated as an additional level
+
+ggplot(x, aes(x = enrolled_unit, fill = university_year)) +
+  geom_bar(position = "dodge") +
+  labs(title = "Distribution of University Year by Enrolled Unit",
+       x = "Enrolled Unit",
+       y = "Count") +
+  theme_minimal() +
+  scale_fill_brewer(palette = "Paired", name = "University Year")  # Customize the legend title
+
+```
+
+Since it relies on students' willingness and availability to complete the survey, there might be a self-selection bias. This type of bias occurs when individuals decide whether to participate in the survey, which may result in over- or underrepresentation of certain types of students.
+For example could we assume more engaged students participate more often. 
+
+The study habits variables are likely to be subjected to self-selection bias. This includes target grade, performance, study hours, academic personality, and university year - students who are more diligent or organized might be more likely to participate, skewing the data towards higher study hours or more consistent study routines
+
+The questions that needed the most improvement includes `height`, `shoe_size` and `usual_bedtime`. Common among these variables was that responses included different units which made the interpretation of them almost impossible. 
+Height, being the least impossible of them, still gave reason to difficulties. Firstly, the units where very different. Some answered in cm/centimeter, m/meter, foot/ft, inches, signs(+, ', \backslash) or just numbers (with or without decimals) without specifying unit. Same goes for the shoe size, this variable was even harder to interpret because of the diversity of how countries define shoe size. Therefore we have no idea if size 10 is Australian, Japanese, European, Chinese and so on and if it is a woman or mans size since that also differs within.  
+Overall these two variables beacuse of thier units, made the cleaning and interpretation very difficult. 
+Lastly the variable `usual_bedtime` didn't specify if the time is given using the 12-hour or 24-hour clock. Therefore we can't know exactly if a student goes to bad at 6:30 pm or am? We could that 3:30 must be am, but we can't be certain and thus not let our own bias influence our interpretation of the data. 
+Overall, after a lot of trying to untangle these variables, I decided not to use them in my tests.  
+
+# Data cleaning
+
+## Gender
+```{r}
+#| label: fig-gender_dist
+#| fig-cap: "Distribution of Gender after cleaning (%)"
+
+# sort(unique(x$gender))
+x <- x |> 
+  mutate(gender = tolower(gender)) |>
+  mutate(gender_clean = case_when(
+    gender %in% c("male", "m", "man", "boy", "cis male", "heterosexual male") ~ "Male",
+    gender %in% c("female", "f", "woman", "girl", "femal", "biological female") ~ "Female",
+    gender %in% c("not female", "cisgender") ~ "Other",
+    TRUE ~ NA_character_  # Handle any unexpected cases
+  )) 
+
+ggplot(x, aes(x = gender_clean)) +
+  geom_bar(aes(y = (after_stat(count))/sum(after_stat(count))), fill = "skyblue", color = "black") +
+  scale_y_continuous(labels = scales::percent_format()) +
+  labs(title = "Distribution of Gender after cleaning",
+       x = "Gender",
+       y = "Percentage (%)") +
+  theme_grey() + theme(
+    plot.title = element_text(size = 16, face = "bold", hjust = 0.5),
+    axis.title = element_text(size = 14),
+    axis.text.x = element_text(angle = 0, hjust = 1, size = 12),
+    axis.text.y = element_text(size = 12),
+    legend.position = "none"  # Hide legend if not necessary
+  )
+```
+
+## Weekly Study Hours
+
+The weekly study hours a few very large outliers - one answered 1500 hours per week (equal to 62.5 days) for this units which suggest a mistype of misunderstanding of the question. These large outliers (> 70 hours) are removed from the dataset. 
+
+```{r}
+sort(unique(x$weekly_study_hours))
+```
+
+
+When plotting the weekly study hours, we notice that the QQ plots shows a violation of the normality assumption and the histogram shows that the data is skewed with a heavy tail. 
+
+```{r}
+#| label: fig-weekly_study_hours_dist
+#| fig-cap: "A: Distribution of Weekly Study Hours after cleaning. B: Q-Q plot showing a violation of the normality assumption."
+
+# Remove/cap extreme values
+x$weekly_study_hours_cleaned <- ifelse(x$weekly_study_hours > 70, NA, x$weekly_study_hours)
+
+cleaned_hours <- na.omit(x$weekly_study_hours_cleaned)
+
+plot1 <-ggplot(data = data.frame(cleaned_hours), aes(x = cleaned_hours)) +
+  geom_histogram(bins = 30, fill = "skyblue", color = "black", alpha = 0.7) +
+  labs(title = "Histogram of Weekly Study Hours", x = "Study Hours", y = "Frequency")
+
+# Create a QQ plot to check for normality visually
+plot2 <- ggplot(data = data.frame(cleaned_hours), aes(sample = cleaned_hours)) +
+  geom_qq() +
+  geom_qq_line() +
+  labs(title = "Q-Q Plot of Weekly Study Hours")
+
+cowplot::plot_grid(plot1, plot2, labels = "AUTO")
+```
+
+
+## Average daily hours of sleep
+```{r}
+#sort(unique(x$average_daily_sleep))
+
+# Function to clean and extract numeric values from the average_daily_sleep column
+clean_sleep <- function(sleep_str) {
+  # Convert to lowercase to handle variations in text
+  sleep_str <- tolower(sleep_str)
+  
+  # Handle NA values directly
+  if (is.na(sleep_str)) {
+    return(NA_real_)
+  }
+  
+  # Handle ranges like "4-5" or "8-10h"
+  if (str_detect(sleep_str, "[-~]")) {
+    #show(sleep_str)
+    numbers <- as.numeric(unlist(str_extract_all(sleep_str, "\\d+\\.?\\d*")))
+    #show(numbers)
+    return(mean(numbers))
+  }
+  
+  # Handle hours with minutes (e.g., "7 hours 15 mins.")
+  if (str_detect(sleep_str, "hours") & str_detect(sleep_str, "mins")) {
+    hours <- as.numeric(str_extract(sleep_str, "\\d+(?=\\s*hours)"))
+    mins <- as.numeric(str_extract(sleep_str, "\\d+(?=\\s*mins)"))
+    return(hours + mins / 60)
+  }
+  
+  # Handle minutes only (e.g., "440 minutes")
+  if (str_detect(sleep_str, "minutes")) {
+    minutes <- as.numeric(str_extract(sleep_str, "\\d+"))
+    return(minutes / 60)
+  }
+  # Handle cases with plain numeric values or hours (e.g., "8", "8h", "7 hours")
+  if (str_detect(sleep_str, "^\\d+\\.?\\d*$") | str_detect(sleep_str, "hours?|hrs?|h|hours")) {
+    return(as.numeric(str_extract(sleep_str, "\\d+\\.?\\d*")))
+  }
+  
+  # Handle non-numeric cases (e.g., "Enough", "sleep 10 hours a day")
+  if (str_detect(sleep_str, "enough|sleep")) {
+    return(NA_real_)
+  }
+  
+  # Default case: return NA if no other condition is met
+  return(NA_real_)
+}
+
+# Apply the cleaning function to the average_daily_sleep column
+x <- x |> 
+  mutate(average_daily_sleep_clean = sapply(average_daily_sleep, clean_sleep)) |> 
+  mutate(average_daily_sleep_clean = round(average_daily_sleep_clean, digits=1))
+
+# Check the unique values after cleaning
+#sort(unique(x$average_daily_sleep_clean))
+```
+
+
+
+
+## Sibling Count
+
+```{r}
+unique(sort(x$sibling_count))
+
+x <- x |> 
+  mutate(sibling_count_clean = case_when(
+    sibling_count %in% c("no", "none") ~ "0.0",
+    sibling_count %in% c("I have 2 siblings", "2 and my dog :)") ~ "2.0",
+    sibling_count %in% c("one", "One") ~ "1.0",
+    sibling_count %in% c("many", "Too many", "bicycle") ~ NA_character_,
+    TRUE ~ sibling_count,
+    TRUE ~ NA_character_  # Handle any unexpected cases
+  )) 
+
+x <- x |> mutate(sibling_count_clean = as.integer(sibling_count_clean))
+length(x$sibling_count_clean) # 305
+
+ggplot(x, aes(x = sibling_count_clean)) +
+  geom_bar(aes(y = (after_stat(count))/sum(after_stat(count))), fill = "skyblue", color = "black") +
+  scale_y_continuous(labels = scales::percent_format()) +
+  labs(title = "Distribution of the number of siblings the students have (%)",
+       x = "Number of siblings",
+       y = "Percentage") +
+  scale_x_continuous(breaks = seq(min(x$sibling_count_clean, na.rm = TRUE), max(x$sibling_count_clean, na.rm = TRUE), by = 1)) +
+  theme_grey() + theme(
+    plot.title = element_text(size = 16, face = "bold", hjust = 0.5),
+    axis.title = element_text(size = 14),
+    axis.text.x = element_text(angle = 0, hjust = 1, size = 12),
+    axis.text.y = element_text(size = 12),
+    legend.position = "none"  # Hide legend if not necessary
+  )
+```
+
+## relationship_status
+
+```{r}
+sort(unique(x$relationship_status))
+
+# Function to clean the relationship_status column
+clean_relationship_status <- function(status_str) {
+  # Handle NA values directly
+  if (is.na(status_str)) {
+    return(NA_character_)
+  }
+  
+  # Convert to lowercase for easier matching
+  status_str <- tolower(status_str)
+  
+  # Standardize positive relationship statuses
+  if (status_str %in% c("yes")) {
+    return("Yes")
+  }
+  
+  # Standardize negative relationship statuses
+  if (status_str %in% c("no", "no but i would like to have one, please")) {
+    return("No")
+  }
+  
+  # Handle ambiguous or unclear responses
+  if (status_str %in% c("not sure", "tears","i have 2", "multiple")) {
+    return(NA_character_)
+  }
+  
+  # Default case: return NA for any other invalid inputs
+  return(NA_character_)
+}
+
+# Apply the cleaning function to the relationship_status column
+x <- x |> 
+  mutate(relationship_status_clean = sapply(relationship_status, clean_relationship_status))
+
+# Check the unique values after cleaning
+sort(unique(x$relationship_status_clean))
+
+ggplot(x, aes(x = relationship_status_clean)) +
+  geom_bar(aes(y = (after_stat(count))/sum(after_stat(count))), fill = "skyblue", color = "black") +
+  scale_y_continuous(labels = scales::percent_format()) +
+  labs(title = "Distribution of relationship status (%)",
+       x = "",
+       y = "Percentage") +
+  theme_grey() + theme(
+    plot.title = element_text(size = 16, face = "bold", hjust = 0.5),
+    axis.title = element_text(size = 14),
+    axis.text.x = element_text(angle = 0, hjust = 1, size = 12),
+    axis.text.y = element_text(size = 12),
+    legend.position = "none"  # Hide legend if not necessary
+  )
+```
+
+
+## Social Media platforms
+
+```{r}
+x |> janitor::tabyl(social_media) |> 
+  gt::gt() |> 
+  gt::fmt_percent(columns = 3:4, decimals = 1) |> 
+  gt::cols_label(social_media = "Favourite social media platform")
+
+x= x |> mutate(
+  social_media_clean = tolower(social_media),
+  social_media_clean = str_replace_all(social_media_clean, '[[:punct:]]',' '),
+  social_media_clean = stringr::word(social_media_clean),
+  social_media_clean = case_when(
+    stringr::str_starts(social_media_clean,"in") ~ "instagram",
+    stringr::str_starts(social_media_clean,"ig") ~ "instagram",
+    stringr::str_starts(social_media_clean,"tik") ~ "tiktok",
+    stringr::str_starts(social_media_clean,"we") ~ "wechat",
+    stringr::str_starts(social_media_clean,"twi") ~ "twitter",
+    stringr::str_starts(social_media_clean,"x") ~ "twitter",
+    stringr::str_starts(social_media_clean,"mess") ~ "facebook",
+    stringr::str_starts(social_media_clean,"bil") ~ "bilibili",
+    is.na(social_media_clean) ~ "none",
+    TRUE ~ social_media_clean
+  ),
+  social_media_clean = tools::toTitleCase(social_media_clean),
+  social_media_clean = forcats::fct_lump_min(social_media_clean, min = 10)
+)
+```
+
+
+```{r}
+x |> janitor::tabyl(social_media_clean) |> 
+  arrange(desc(n)) |> 
+  gt::gt() |> 
+  gt::fmt_percent(columns = 3, decimals = 1) |> 
+  gt::cols_label(social_media_clean = "Favourite social media platform") |> 
+  gt::cols_align(align = "left", columns = 1)
+```
+
+
+```{r}
+#sort(unique(x$social_media_clean))
+ggplot(x, aes(x = social_media_clean)) +
+  geom_bar(aes(y = (after_stat(count))/sum(after_stat(count))), fill = "skyblue", color = "black") +
+  scale_y_continuous(labels = scales::percent_format()) +
+  labs(title = "Distribution of social media platforms among the students (%)",
+       x = "",
+       y = "%") +
+  theme_grey() + theme(
+    plot.title = element_text(size = 16, face = "bold", hjust = 0.5),
+    axis.title = element_text(size = 14),
+    axis.text.x = element_text(angle = 0, hjust = 1, size = 12),
+    axis.text.y = element_text(size = 12),
+    legend.position = "none"  # Hide legend if not necessary
+  )
+```
+
+
+
+## target_grade
+```{r}
+x <- x |> mutate(target_grade = factor(target_grade, 
+                             levels = c("High Distinction", "Distinction", "Credit", "Pass", "Fail", NA)))
+
+ggplot(x, aes(x = target_grade)) +
+  geom_bar(aes(y = (after_stat(count))/sum(after_stat(count))), fill = "skyblue", color = "black") +
+  scale_y_continuous(labels = scales::percent_format()) +
+  labs(title = "Distribution of target grade (%)",
+       x = "",
+       y = "Percentage") +
+  theme_grey() + theme(
+    plot.title = element_text(size = 16, face = "bold", hjust = 0.5),
+    axis.title = element_text(size = 14),
+    axis.text.x = element_text(angle = 0, hjust = 1, size = 12),
+    axis.text.y = element_text(size = 12),
+    legend.position = "none"  # Hide legend if not necessary
+  )
+```
+
+# Tests and results
+
+
+## Is there an association between the number of siblings a student has and their relationship status?
+
+To investigate whether there is an association between the number of siblings (`sibling_count_clean`) and relationship status (`relationship_status_clean`) we will perform a Chi-Square test of independence. This test is appropriate as both variables are categorical.
+
+
+The contingency table below shows the observed counts of students categorized by the number of siblings they have and their relationship status. Given the values in the table, where some cells have counts less than 5, the sample size assumption for the Chi-Square test of independence is violated. Thus we need to combine some of the categories.
+```{r}
+table(x$relationship_status_clean,x$sibling_count_clean)
+```
+```{r}
+x <- x %>%
+  mutate(sibling_group = case_when(
+    sibling_count_clean %in% c("3", "4", "5", "6") ~ "3+",
+    TRUE ~ as.character(sibling_count_clean)
+  )) |> mutate(sibling_group = factor(sibling_group, 
+                             levels = c("0","1", "2", "3+" ,NA)))
+
+# Print the updated table to see the changes
+# table(x$sibling_group)
+
+# Create new contingency table with combined categories
+tabl<- table(x$relationship_status_clean, x$sibling_group)
+tabl
+```
+
+```{r}
+# Perform Chi-Square Test
+chisq.test(tabl, correct=FALSE)
+```
+### Workflow
+
+1. **Hypotheses**   
+$H_0$ : There is no association between the number of siblings a student has and their relationship status.    
+$H_1$ : There is an association between the number of siblings a student has and their relationship status.
+
+
+2. **Assumptions**  
+The expected frequencies, $e_i = np_i \geq 5$. Observations are independent.
+
+
+3. **Test statistic**  
+The chi-squared statistic measures the difference between observed and expected frequencies of the gender categories.
+$$T = \sum_{i=1}^n \frac{(Y_i - e_i)^2}{e_i} \text{ under } H_0, T \sim \chi^2_2 \text{ approximately}$$
+
+
+4. **Observed test statistic**  
+$$t_0 = \sum_{i=1}^n \frac{(y_i - e_i)^2}{e_i} = 3.395$$
+
+5. **p-value** 
+$$P(T \geq  t_0) = P(\chi^2_2 \geq 3.395) = 0.335 > 0.05$$
+
+6. **Decision**  
+Since the p-value is must greater than 0.05, this suggest that the data are consistent with $H_0$ and thus we cannot reject the hull hypothesis and there might an association between the number of siblings a student has and if their relationship status. 
+
+
+
+## Does the distribution of gender among the participated students follow the same proportions as the student diversity enrolled at Univeristy of Sydney asa os 2021? 
+
+I tried to find data about the gender distribution enrolled the DATA units, but the only relatively close I found was a study conducted by Teaching@Sydney from 2022 (@Usyd_stu_div) which shows that the ratio between female and male is 57:43 (with < 1% classified as other) for all students enrolled in University of Sydney as of 2021. 
+
+Lets check if the proportions of gender enrolled in DATA2x02 follows the same distribution. It seems based on data in the table that the female and male ratio is swapped around for our observed proportions (`obs_proportion`) compared to the expected proportion (`exp_proportion`).
+
+```{r, eval=FALSE}
+# Check number of students identifying as "other". 
+x %>%
+  filter(gender_clean == "Other")
+```
+
+
+```{r}
+# Create a new variable 'gender_new' that categorizes into 'female', 'male', and 'other'
+x <- x |> 
+  mutate(gender_new = case_when(
+    gender_clean == "Female" ~ "female",
+    gender_clean == "Male" ~ "male"
+  ))
+
+# Calculate the observed distribution of gender in the dataset
+observed_gender <- table(x$gender_new)
+observed_gender_df <- as.data.frame(observed_gender)
+observed_gender_df <- observed_gender_df |> 
+  mutate(obs_proportion = round((Freq / sum(Freq)), digits = 3)) |>
+  mutate(exp_proportion = c(female = 0.57, male = 0.43))
+observed_gender_df
+```
+
+```{r}
+# Perform the Chi-squared
+chisq.test(x = observed_gender, p = observed_gender_df$exp_prop, correct = FALSE)
+```
+
+### Workflow
+
+1. **Hypotheses**  
+$H_0 :$ The gender distribution in DATA2x02 matches the reported university-wide proportions.  
+$H_1 :$ The gender distribution in DATA2x02 does not match the university-wide proportions. 
+
+
+2. **Assumptions**  
+Each observation (student's gender identity) is independent of the others ("iid").
+Sample Size: The expected frequency of each category (female, male, other) should be at least 5 for the chi-squared test to be valid. This is commonly known as the rule of 5. Therefore "Other" column is excluded, since < 5 students identified as that. 
+
+
+3. **Test statistic**  
+The chi-squared statistic measures the difference between observed and expected frequencies of the gender categories.
+$$T = \sum_{i=1}^n \frac{(Y_i - e_i)^2}{e_i} \text{ under } H_0, T \sim \chi^2_2 \text{ approximately}$$
+
+
+4. **Observed test statistic**  
+$$t_0 = \sum_{i=1}^n \frac{(y_i - e_i)^2}{e_i} = 28.19$$
+
+5. **p-value**    
+$$P(T \geq  t_0) = P(\chi^2_2 \geq 28.19) = 1.098e^{-07} < 0.05$$
+
+6. **Decision**    
+Since the p-value is extremely small reject the null hypothesis. Which indicates that there is a statistically significant difference between the gender distribution of students in DATA2x02 and the university-wide proportions reported in 2021. The observed data shows a swapped ratio for female and male compared to the expected proportions based on the university statistics. 
+
+
+
+
+
+## Does the students in DATA2x02 get the recommend 8 hours of sleep in average?
+
+Now visualizing the cleaned `average_daily_sleep` shows us on @fig-average_daily_sleep_dist the distribution of the data. A shows us that the majority of data points seem to cluster around 7 to 9 hours, suggesting that most students get this amount of sleep. The normal curve overlaid the histogram is not perfect, indicating that the data might not be perfectly normally distributed. There are deviations, especially in the tails (both lower and higher sleep durations) and the very large portion of data in the center. B provides a visual summary of the median, quartiles, and extreme values - all very centered around 7.5 hours, aligning with typical sleep recommendations.
+
+```{r}
+#| label: fig-average_daily_sleep_dist
+#| fig-cap: "A: Distribution of average daily sleep hours answered by the students after cleaning with a normal curve on top (red line). B: Boxplot of the same data. Both showing a large portion of data in the center but also some outliers."
+#| 
+# Now, plot the histogram with a normal curve
+x <- x |> 
+  filter(average_daily_sleep_clean != 1.0)
+
+cleaned_hours <- na.omit(x$average_daily_sleep_clean)
+
+plot1 <- ggplot(x, aes(x = average_daily_sleep_clean)) +
+  geom_histogram(aes(y = ..density..), binwidth = 0.5, fill = "skyblue", color = "black") +
+  stat_function(fun = dnorm, args = list(mean = mean(x$average_daily_sleep_clean, na.rm = TRUE),
+                                         sd = sd(x$average_daily_sleep_clean, na.rm = TRUE)),
+                color = "red", linewidth = 1) +
+  labs(title = "Distribution with a normal curve",
+       x = "Average Daily Sleep (Hours)",
+       y = "Density") +
+  theme_grey() +
+  scale_x_continuous(breaks = seq(0, 12, 1))  # Adjust the x-axis for better readability
+
+
+plot2 <- ggplot(x, aes(y = average_daily_sleep_clean)) +
+  geom_boxplot(fill = "skyblue", color = "black") +
+  labs(title = "Boxplot",
+       y = "Hours",
+       x = "") +  # x is empty because there's only one variable
+  theme_grey()
+
+# Create a QQ plot to check for normality visually
+plot3 <- ggplot(data = data.frame(cleaned_hours), aes(sample = cleaned_hours)) +
+  geom_qq() +
+  geom_qq_line() +
+  labs(title = "Q-Q Plot")
+
+# Calculate differences from the hypothesized median
+differences <- x$average_daily_sleep_clean - 8
+
+plot4 <- ggplot(data.frame(differences), aes(x = differences)) +
+  geom_histogram(bins = 30, fill = "skyblue", color = "black") +
+  geom_vline(xintercept = 0, color = "red", linetype = "dashed") +
+  labs(title = "Differences from mean=8",
+       x = "Differences (Hours)",
+       y = "Frequency") +
+  theme_grey()
+
+cowplot::plot_grid(plot1, plot2, plot3, plot4,  labels = "AUTO")
+```
+
+Furthermore the `shapiro.test()` gives us an extremely small p-value, which strongly suggests that the data for average daily sleep hours are not normally distributed. Therefore we will instead perform a non-parametric alternative that does not assume normality. The Wilcoxon Signed-Rank Test is an appropriate choice here. This test is used to compare the median of the sampled data to a hypothesized median when the data are not normally distributed.
+
+
+```{r}
+shapiro.test(x$average_daily_sleep_clean)
+
+```
+Test:
+```{r}
+t.test(x$average_daily_sleep_clean, mu = 8, alternative = "two.sided")
+wilcox.test(x$average_daily_sleep_clean, mu = 8, alternative = "two.sided", conf.int = TRUE)
+```
+
+
+### Workflow
+
+1. **Hypotheses**  
+$H_0 : \mu = \mu_0 = 8$ The mean average daily sleep is 8 hours.  
+$H_1 : \mu \neq \mu_0 $ The mean average daily sleep is not 8 hours.  
+
+
+2. **Assumptions**  
+Each observation (student's gender identity) is independent of the others ("iid").
+We noticed a violation of the normality assumption (@fig-average_daily_sleep_dist). 
+We assume that the differences (after subtracting the hypothesized median) are symmetrically distributed about zero.
+
+3. **Test statistic**  
+The sum of the ranks of the differences that have the same sign as the median of the differences.
+$$ W = \sum \text{sign} (D_i) \times \text{rank}(|D_i|) \text{ under } H_0$$
+where $D_i= X_i - \mu_0$ and $X_i$ is each observed value and $\mu_0$ is the hypothesized median, 8 hours.
+
+4. **Observed test statistic**  
+$$V=4912$$$
+5. **p-value**    
+The p-value is $2.904e^{-12}$ which is extremely small and thus there seem to be significant evidence against $H_0$. Furthermore, the confidence interval (range: [7.0, 7.3]) does not include the hypothesized median of 8 hours, reinforcing the test result that the mean is indeed different from 8.
+
+6. **Decision**    
+The results indicate that students in the DATA2x02 class sleep significantly less than the recommended 8 hours on average, with a median sleep duration estimated to be around 7 hours. This deviation from the recommended sleep duration could have implications for students' health, well-being, and academic performance.
+
+
+## Is there an association between a students social media peference and their target grade?
+
+To answer this we shuffle the `social_media_clean` labels among the students while keeping the `target_grade` labels fixed.
+Then we compute a chi-squared statistic for each permutation.
+
+```{r}
+# Factor Conversion: The code ensures that social_media_clean and target_grade are treated as categorical variables (factors), which is important for the chi-squared test.
+x$social_media_clean <- as.factor(x$social_media_clean)
+
+# Calculate the observed chi-squared statistic
+observed_stat <- chisq.test(x$social_media_clean, x$target_grade)
+observed_stat
+
+# Permutation test
+set.seed(0)  # Set seed for reproducibility
+n_permutations <- 2000  # Number of permutations
+permutation_stats <- replicate(n_permutations, {
+  # Shuffle the 'social_media_clean' column
+  shuffled_social_media <- sample(x$social_media_clean)
+  
+  # Calculate the chi-squared statistic for the permuted data
+  chisq.test(shuffled_social_media, x$target_grade, simulate.p.value = TRUE)$statistic
+})
+
+# Calculate the p-value
+# The proportion of permuted statistics that are as extreme or more extreme than the observed statistic provides the p-value.
+p_value <- mean(permutation_stats >= observed_stat$statistic)
+
+cat("P-value from permutation test:", p_value, "\n")
+```
+
+
+### Workflow
+
+1. **Hypotheses** 
+$H_0$ : There is no association between social media platform and target_grade.    
+$H_1$ : There is an association between social media platform and target_grade .
+
+
+2. **Assumptions**  
+The pairs (social media preference, target grade) are independent between students.
+
+
+3. **Test statistic**  
+The chi-squared statistic measures the difference between observed and expected frequencies of the gender categories.
+$$T = \sum_{i=1}^n \frac{(Y_i - e_i)^2}{e_i} \text{ under } H_0, T \sim \chi^2_2 \text{ approximately}$$
+
+
+4. **Observed test statistic**  
+$$t_0 = \sum_{i=1}^n \frac{(y_i - e_i)^2}{e_i} = 29.67$$
+5. **p-value**    
+$$P(T \geq  t_0) = P(\chi^2_2 \geq 29.67) = 0.56$$
+
+6. **Decision**    
+Since the p-value is greater than the typical alpha level of 0.05, we do not reject the null hypothesis. There is not enough statistical evidence to suggest an association between social media platform preference and target grade among the students.
