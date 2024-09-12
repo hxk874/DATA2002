@@ -1,0 +1,47 @@
+---
+title: "ANOVA - yield"
+date: "2024-09-09"
+author: "Ellen Ebdrup"
+output: 
+  html_document: 
+    ### IMPORTANT ###
+    # self_contained: true # Creates a single HTML file as output
+    code_folding: show # Code folding; allows you to show/hide code chunks
+    ### USEFUL ###
+    code_download: true # Includes a menu to download the code file
+    ### OPTIONAL ###
+    df_print: paged # Sets how dataframes are automatically printed
+    theme: readable # Controls the font, colours, etc.
+    toc: true # (Useful) Creates a table of contents!
+    toc_float: true # table of contents at the side
+    number_sections: false # (Optional) Puts numbers next to heading/subheadings
+---
+
+```{r}
+library(janitor)
+library(dplyr)
+library(tidyverse)
+library(ggplot2)
+```
+
+# ANOVA
+**Analysis of Variance**
+
+## Plant Growth
+The PlantGrowth data has results from an experiment to compare yields (as measured by dried weight of plants) obtained under a control and two different treatment conditions
+
+We want to compare the means of the three different groups, the control, treatment 1 and treatment 2 groups.
+```{r}
+# the data is already "in" R
+data("PlantGrowth") 
+
+PlantGrowth |> ggplot() +
+  aes(y = weight, x = group, 
+      colour = group) + 
+  geom_boxplot(coef = 10) + 
+  geom_jitter(width = 0.1, size = 5) + 
+  theme(legend.position = "none") +
+  labs(y = "Weight (g)", x = "Group")
+```
+
+

@@ -27,7 +27,7 @@ dat = data.frame(
 ```
 
 
-Another dataset frmo Quiz \#4
+Another dataset from Quiz \#4
 ```{r}
 A = c(1.83, 0.50, 1.62, 2.48, 1.68, 1.88, 1.55, 2.06, 1.30)
 B = c(0.878, 0.647, 0.598, 2.05, 1.06, 1.29, 1.06, 3.14, 1.29)
@@ -75,6 +75,7 @@ n_A = sum_dat |>
 n_B = sum_dat |> 
   filter(method == "B") |>
   pull(n)
+
 # using the sums of the A sample
 w_A = sum_dat |> 
   filter(method == "A") |> 

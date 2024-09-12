@@ -1,0 +1,388 @@
+---
+title: "Multiple testing"
+date: "2024-09-09"
+author: "Ellen Ebdrup"
+output: 
+  html_document: 
+    ### IMPORTANT ###
+    # self_contained: true # Creates a single HTML file as output
+    code_folding: show # Code folding; allows you to show/hide code chunks
+    ### USEFUL ###
+    code_download: true # Includes a menu to download the code file
+    ### OPTIONAL ###
+    df_print: paged # Sets how dataframes are automatically printed
+    theme: readable # Controls the font, colours, etc.
+    toc: true # (Useful) Creates a table of contents!
+    toc_float: true # table of contents at the side
+    number_sections: false # (Optional) Puts numbers next to heading/subheadings
+---
+
+```{r}
+library(janitor)
+library(dplyr)
+library(tidyverse)
+library(ggplot2)
+```
+
+
+# microRNA and Alzheimer’s disease
+
+```{r}
+load("data/microRNA_full.RData")
+```
+
+```{r}
+str(AD)
+```
+
+```{r}
+# the 8 digit number is the subject id 
+# the binary numbers indicate presence (1) or absence (0) of Alzheimer’s disease (AD)
+head(AD)
+
+# convert to df
+disease_status = data.frame(AD) |> 
+  tibble::rownames_to_column("subject")
+str(disease_status)
+```
+
+```{r}
+microRNA_Data[1:4,1:3]
+```
+Reshape the microRNA data and merge in the disease status information:
+```{r}
+mirna = microRNA_Data |>
+  tibble::rownames_to_column("microRNA") |> 
+  tidyr::pivot_longer(cols = -1, names_to = "subject", values_to = "value") |> 
+  dplyr::left_join(disease_status)
+head(mirna, n = 4)
+```
+## How many patients have Alzheimer’s?
+```{r}
+mirna |> select(subject, AD) |> 
+  distinct() |> 
+  janitor::tabyl(AD) |> 
+  janitor::adorn_pct_formatting()
+
+mirna |> 
+  group_by(microRNA) |> 
+  nest() |> 
+  ungroup() |> 
+  slice(1:15) |> # extract first 15 groups
+  unnest(cols = everything()) |> 
+  ggplot() + 
+  aes(y = reorder(microRNA, value), 
+      x = value, colour = factor(AD)) + 
+  geom_boxplot(coef = 10) + 
+  scale_color_brewer(palette = "Set1") + 
+  theme(legend.position = "top") + 
+  labs(colour = "Disease status",
+       y = "MicroRNA")
+```
+## Welch 2-sample t-test
+Let’s use Welch two-sample t-tests to compare the mean for people with Alzheimer’s to people without Alzheimer’s for all 309 microRNA.
+```{r}
+mirna_res = mirna |> 
+  group_by(microRNA) |> 
+  summarise(pval = t.test(value~AD)$p.value)
+mirna_res |> ggplot() + aes(x = pval) + 
+  geom_histogram(boundary = 0, binwidth = 0.05, 
+                 fill = "skyblue",
+                 colour = "black")
+
+sum(mirna_res$pval < 0.05) # = 49
+```
+Of the 309 microRNA tested, 49 have p-values less than 0.05.
+
+Are all of these “statistically significant” differences important?
+
+- If there was no association between any microRNAs and Alzheimer’s disease our p-values follow a uniform distribution.
+- We can generate a set of p-values knowing that there is no association and visualise this.
+
+```{r}
+set.seed(2)
+mirna_res = mirna_res |> 
+  mutate(null_pval = runif(n = n(), 
+                           min = 0, 
+                           max = 1))
+mirna_res |> ggplot() + aes(x = null_pval) + 
+  geom_histogram(boundary = 0, 
+                 binwidth = 0.05,
+                 fill = "midnightblue", 
+                 colour = "black")
+
+sum(mirna_res$null_pval < 0.05) # = 15
+```
+
+When we know that there are no truly important microRNAs, we still see 15 “significant” p-values in this simulated example.
+
+# Error rates
+## Controlling the family-wise error rate
+$$FWEER=P(V\geq 1)$$
+
+The probability of at least one false positive is $1-(1-\alpha)^m$
+
+```{r}
+m = 20
+alpha = 0.05
+1 - (1 - alpha)^m
+```
+
+### Bonferroni correction
+  Pros: Easy to calculate, conservative
+  Cons: May be very “conservative”
+$$\alpha^* = \frac{\alpha}{m}$$
+```{r}
+m = 20
+alpha = 0.05
+1 - (1 - alpha/m)^m
+```
+
+**10 microRNA p-values: Bonferroni method**
+```{r}
+#install.packages("kableExtra")
+alpha = 0.2
+m = 10
+M = nrow(mirna_res)
+set.seed(123, sample.kind = "Rounding")
+sample_rows = sample(1:M, size = m)
+mirna10 = mirna_res |> 
+  select(microRNA, pval) |> 
+  slice(sample_rows) |> 
+  mutate(p_bonferroni = pmin(pval*m, 1)) |> 
+  arrange(pval)
+
+mirna10 |> 
+  knitr::kable(digits = 4) |> 
+  kableExtra::kable_styling(
+    font_size = 16)
+```
+
+## Controlling the false discovery rate
+$$FDR=E\left[ \frac{FP}{R}\right]$$
+where FP is Type I error
+
+### Benjamini–Hochberg procedure
+
+**10 microRNA p-values: BH method**
+```{r}
+alpha = 0.2
+m = 10
+p_vals = sort(mirna10$pval)
+# BH procedure
+# j=1: smallest p-value < 1*alpha/m?
+p_vals[1] < 1*alpha/m
+```
+
+```{r}
+# j=2: 
+# second smallest p-value < 2*alpha/m?
+p_vals[2] < 2*alpha/m
+```
+
+```{r}
+# j=3: 
+# third smallest p-value < 3*alpha/m?
+p_vals[3] < 3*alpha/m
+```
+
+
+```{r}
+# j=4: 
+# fourth smallest p-value < 4*alpha/m?
+p_vals[4] < 4*alpha/m
+```
+
+```{r}
+# j=5: 
+# fifth smallest p-value < 5*alpha/m?
+p_vals[5] < 5*alpha/m
+```
+
+```{r}
+# and so on ...
+```
+
+```{r}
+# in general...
+result = vector(length = length(p_vals))
+p_vals = sort(p_vals) # we already did this but just emphasising it
+for(j in seq(p_vals)) { # seq(p_vals) is the same as 1:length(pvals)
+  result[j] = p_vals[j] < j*alpha/m
+}
+result
+```
+
+```{r}
+largest_true = max(which(result == TRUE))
+largest_true
+```
+
+```{r}
+significant_pvals = p_vals[1:largest_true]
+significant_pvals
+```
+
+**10 microRNA p-values: BH vs Bonferonni**
+The lines are the significance thresholds for the three methods. If a point is below the line, the method would consider it “significant”.
+```{r}
+alpha = 0.2; m = 10
+pvaldf = data.frame(p_vals) |> mutate(rank = rank(p_vals, ties.method = "random"))
+pvaldf |> ggplot() + aes(y = p_vals, x = rank) + 
+  geom_abline(aes(intercept = 0, slope=alpha*1/m, colour = 'Benjamini–Hochberg (FDR)'), linewidth = 1.5) +
+  geom_hline(aes(yintercept = alpha, colour = 'No correction'), linewidth = 1.5) + 
+  geom_hline(aes(yintercept = alpha/m, colour = 'Bonferroni (FWER)'), linewidth = 1.5) + 
+  geom_point(size = 2) + 
+  scale_x_continuous(breaks = 1:10) + 
+  scale_colour_manual(name='Method',
+                     breaks=c('No correction', 'Bonferroni (FWER)', 'Benjamini–Hochberg (FDR)'),
+                     values=c('No correction'='blue',
+                              'Bonferroni (FWER)'='red', 
+                              'Benjamini–Hochberg (FDR)'='orange')) +
+  theme_classic(base_size = 24) + labs(y = "p-value", x = "Ordering")
+```
+
+
+# Simulation experiments
+
+## Case study I: no true positive
+```{r}
+set.seed(1234)
+p_vals = rep(NA, 1000)
+B = 10000
+case1 = tibble(experiment = 1:B) |> 
+  group_by(experiment) |> 
+  reframe(x_sample = rnorm(20),
+          y_sample = rnorm(20)) |> 
+  group_by(experiment) |> 
+  nest() |> 
+  mutate(
+    test = map(data, 
+               ~t.test(.$x_sample, 
+                       .$y_sample,
+                       var.equal = TRUE) |> 
+                 broom::tidy())) |> 
+  unnest(test) |> 
+  ungroup()
+mean(case1$p.value < 0.05)
+```
+
+Get R to do the corrections for us using the p.adjust() function:
+```{r}
+case1 = case1 |> 
+  mutate(
+    p_bonf = p.adjust(p.value, 
+                      "bonferroni"),
+    p_bh = p.adjust(p.value, "BH")
+  )
+case1 |> select(experiment, p.value,
+                 p_bonf, p_bh) |> 
+  head()
+```
+
+Proportion of “significant” results
+```{r}
+case1 |> ungroup() |> 
+  summarise(
+    original = mean(p.value < 0.05),
+    bonferroni = mean(p_bonf < 0.05),
+    bh = mean(p_bh < 0.05)
+  )
+```
+
+
+## Case study II: 50% true positives
+```{r}
+set.seed(1234)
+B = 10000
+case2 = tibble(experiment = 1:B) |> 
+  group_by(experiment) |> 
+  reframe(x_sample = rnorm(20), y_sample = rnorm(20)) |> 
+  group_by(experiment) |> 
+  rowwise() |> 
+  mutate(truth = if_else(experiment<=B/2, "mu1 - mu2 = 0", "mu1 - mu2 = 2"),
+         y_sample = if_else(truth == "mu1 - mu2 = 2", y_sample + 2, y_sample)) |> 
+  ungroup() |> 
+  nest(data = c(x_sample, y_sample)) |> 
+  mutate(test = map(data, ~t.test(.$x_sample, .$y_sample, var.equal = TRUE) |> 
+                      broom::tidy())) |> 
+  unnest(test) |> ungroup() |> 
+  mutate(
+    prediction = if_else(p.value < 0.05, "reject H0", "don't reject H0"),
+    p_bonf = p.adjust(p.value, method = "bonferroni"),
+    p_bh = p.adjust(p.value, method = "BH"),
+    pred_bonf = if_else(p_bonf < 0.05, "reject H0", "don't reject H0"),
+    pred_bh = if_else(p_bh < 0.05, "reject H0", "don't reject H0"))
+```
+
+
+```{r}
+# no adjustment
+case2 |> tabyl(prediction, truth) |>
+  gt::gt()
+
+# Bonferroni: controls FWER 
+case2 |> tabyl(pred_bonf, truth) |>
+  gt::gt()
+
+# BH: controls FDR 
+case2 |> tabyl(pred_bh, truth) |>
+  gt::gt()
+```
+
+```{r}
+pval2 = case2 |> select(experiment, p.value, p_bonf, p_bh) |> 
+  pivot_longer(cols = c(p.value, p_bonf, p_bh), 
+               names_to = "method", 
+               values_to = "p_value") |> 
+  mutate(method = recode(method, 
+                         "p.value" = "Original", 
+                         "p_bh" = "BH", 
+                         "p_bonf" = "Bonferroni"))
+pval2 |> ggplot() + 
+  aes(x = p_value, fill = method) + 
+  geom_histogram(boundary = 0, binwidth = 0.05, colour = "black") + 
+  facet_grid(~method) + 
+  scale_fill_brewer(palette = "Set1") +
+  scale_x_continuous(breaks = c(0,1)) + 
+  theme(legend.position = "none")
+```
+
+
+# MicroRNA revisited
+```{r}
+mirna_res = mirna_res |> 
+  mutate(
+    p_bonf = p.adjust(pval, method = "bonferroni"),
+    p_bh = p.adjust(pval, method = "BH")
+  )
+mirna_res |> 
+  summarise(original_n_sig = sum(pval < 0.05),
+            bonf_n_sig = sum(p_bonf < 0.05),
+            bh_n_sig = sum(p_bh < 0.05))
+```
+
+```{r}
+library(gt)
+mirna_res |> arrange(pval) |> 
+  select(-null_pval, `Original p-value` = pval, 
+         `Bonferroni p-value` = p_bonf,  `BH p-value` = p_bh) |> 
+  head(n = 10) |> 
+  gt() |> fmt_scientific(columns = 2:4) |> 
+  tab_style(
+    style = list(
+      cell_fill(color = "#F9E3D6"),
+      cell_text(style = "italic")),
+    locations = list(
+      cells_body(columns = `Original p-value`, 
+                 rows = `Original p-value` < 0.05),
+      cells_body(columns = `Bonferroni p-value`, 
+                 rows = `Bonferroni p-value` < 0.05),
+      cells_body(columns = `BH p-value`, rows = `BH p-value` < 0.05)
+    ))
+```
+
+Final comments
+- Multiple testing is an entire subfield of statistics
+- A basic Bonferroni/BH correction is often sufficient
+- If there is strong dependence between tests there may be problems

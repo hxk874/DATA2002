@@ -1,5 +1,5 @@
 ---
-title: "Thought process"
+title: "Week 6 live code"
 output: html_document
 date: "2024-09-04"
 ---
@@ -7,6 +7,7 @@ date: "2024-09-04"
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
+Example code provided during live lecture
 
 **Step 1: Generate the Dataset We’ll create two samples:**
 Sample 1: Normally distributed data.   

@@ -1,0 +1,301 @@
+---
+title: "Lab wk 6"
+date: "2024-09-05"
+author: "Ellen Ebdrup"
+output: 
+  html_document: 
+    ### IMPORTANT ###
+    # self_contained: true # Creates a single HTML file as output
+    code_folding: show # Code folding; allows you to show/hide code chunks
+    ### USEFUL ###
+    code_download: true # Includes a menu to download the code file
+    ### OPTIONAL ###
+    df_print: paged # Sets how dataframes are automatically printed
+    theme: readable # Controls the font, colours, etc.
+    toc: true # (Useful) Creates a table of contents!
+    toc_float: true # table of contents at the side
+    number_sections: false # (Optional) Puts numbers next to heading/subheadings
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(tidyr)
+library(tidyverse)
+```
+
+# Group work
+
+1. Which of the tests that we have considered so far in DATA2002 can be applied here? Why might you use one instead of the other?
+
+```{r}
+Exp = c(110,125,139,142,127)
+Con = c(112,120,128,135,126)
+diff = Exp - Con
+diff 
+(mu = mean(diff))
+
+# give ranks to the differences
+rank(abs(diff),
+     ties.method ="min")
+```
+
+$$H_0 : \mu_{E} - \mu_{C} = 0 \text{  vs.  } H_1 : \mu_{E} - \mu_{C} \neq 0$$
+### Normality check
+This is not usefull, since we have such a small dataset, we already know that the normality assumption will not hold. 
+```{r}
+# Quick visualisation using base R (not ggplot)
+par(mfrow = c(1,2), mar = c(4,5,0.5,0.5))
+boxplot(Exp, Con, names = c('Exp', 'Con'), ylab = "IQ")
+boxplot(Exp - Con, ylab = 'Difference in life satisfaction\n(Old - Young)')
+```
+
+
+
+2. If you were to proceed with a Wilcoxon signed rank test, calculate the test statistic.
+
+
+3. Under the null hypothesis of no difference in the mean IQ score between the experimental and control group, what is the expected value of the Wilcoxon signed rank test statistic?
+
+Two sided test, therefore use: $W^+$
+
+```{r}
+sum_R = 5*(5+1)/4
+# two groups:
+sum_exp_pr_group = sum_R/2 # E(W^+)
+
+```
+
+
+4. Let’s say we are testing a one sided alternative, i.e. the researchers hypothesised that the experimental group that were sent to school had higher IQs than the control group. If you had to guess which of the following p-values looks most reasonable for this example?
+
+a. 0.0001
+b. 0.9663
+c. 0.0938 <= around 10%. This one
+d. 0.4367
+
+Don’t perform the test in R, just think about the observed test statistic, the expected test statistic and the sample size.
+
+
+# Questions
+
+## Drug abuse and IQ
+
+```{r}
+iq = c(100,90,135,108,107,119,127,109,105)
+
+mu_obs = mean(iq)
+
+diff_from_107 = 107 - iq
+```
+
+### Check for normality
+
+QQplot:  
+Boxplot:  
+- a little uneven
+
+
+
+```{r}
+par(mfrow = c(1,2))
+boxplot(iq, ylab = 'IQ, 16 years of age or older')
+qqnorm(iq)
+qqline(iq)
+```
+
+```{r}
+wilcox.test(iq,mu=107, alternative="greater", correct=FALSE)
+```
+
+
+
+
+
+## Weight gain
+
+The weight of 5 pigs on diet X and 5 pigs on diet Y are
+
+Diet $X : \{12, 16, 16, 12, 10\}$ and diet $Y : \{30, 12, 24, 32, 24\}$.
+
+Test if there is a difference in weight using the Wilcoxon rank-sum test. 
+In this test we only care about the rank. 
+
+What is the corresponding p-value?
+
+```{r}
+A = c(12, 16, 16, 12, 10)
+B = c(30, 12, 24, 32, 24)
+dat = data.frame(
+  yield = c(A, B),
+  method = c(rep("A", length(A)),
+             rep("B", length(B)))
+)
+
+library(ggplot2)
+ggplot(wdat, aes(x = method, y = weight)) + 
+  geom_boxplot() + 
+  geom_point(size = 4, colour = "blue")
+```
+
+
+# Rank from 1 to 10 => continous
+```{r}
+wdat = wdat |> mutate(rank = rank(weight))
+wdat
+```
+
+```{r}
+w_X = wdat |> 
+  filter(method == "X") |> 
+  pull(rank) |> 
+  sum()
+w_X
+
+sum_wdat = wdat |>
+  group_by(method) |> 
+  summarise(n = n(),
+            w = sum(rank))
+sum_wdat
+```
+
+```{r}
+n_X = sum_wdat |> 
+  filter(method == "X") |> 
+  pull(n)
+n_Y = sum_wdat |> 
+  filter(method == "Y") |>
+  pull(n)
+# using the sums of the X sample
+w_X = sum_wdat |> 
+  filter(method == "X") |> 
+  pull(w)
+ew_X = n_X * (n_X + n_Y + 1)/2 
+minw_X = n_X * (n_X + 1)/2 
+
+# check what the expected value is
+ew_X # = 27.5
+# and 
+minw_X # = 15
+```
+
+
+```{r}
+# w_X : obs w_x
+c(minw_X, w_X, ew_X) # w_A > ew_A
+
+# looking in the upper tail, so use lower.tail = FALSE
+2 * pwilcox(w_X - minw_X - 1, n_X, n_Y, lower.tail = FALSE)
+```
+
+### What if we use the sums of the ranks of the B sample?
+
+
+
+```{r}
+sum_wdat
+# using the sums of the B sample
+w_Y = sum_wdat |> 
+  filter(method == "Y") |> 
+  pull(w)
+ew_Y = n_Y * (n_Y + n_X + 1)/2 
+minw_Y = n_Y * (n_Y + 1)/2 
+c(minw_Y, w_Y, ew_Y)
+# now looking in the lower tail
+2 * pwilcox(w_Y - minw_Y, n_Y, n_X)
+
+```
+Correct answer b.
+
+
+
+## Rats teaching rats
+
+From a group of nine rats available for a study of transfer of learning, five were selected at random and were trained to imitate leader rats in a maze. They were then placed together with four untrained control rats in a situation where imitation of the leaders enable them to avoid receiving an electric shock. The results (the number of trials required to obtain ten correct responses in ten consecutive trials) were as follows:
+
+Trained rats: {78, 64, 75, 45, 82} and Controls: {110, 70, 53, 51}.
+
+Test if there is a difference in the number of trials required between the trained rats and the controls using the Wilcoxon rank-sum test given the following probabilities:
+
+
+Since there are not ties, we cant calc p-value 
+
+```{r}
+T = c(78, 64, 75, 45, 82)
+C = c(110, 70, 53, 51)
+
+data.frame(x = 0:10, 
+           p = round(pwilcox(0:10, m = 4, n = 5), 4)) # probability
+```
+
+```{r}
+(mu_T = mean(T))
+(mu_C = mean(C))
+diff = mu_T-mu_C
+diff 
+```
+
+
+```{r}
+# Perform Wilcoxon rank-sum test
+wilcox.test(T, C, exact = FALSE)
+```
+```{r}
+A = c(78, 64, 75, 45, 82)     # n_A = 5
+B = c(110, 70, 53, 51)        # n_B = 4
+# Then N = 9 
+dat = data.frame(
+  yield = c(A, B),
+  method = c(rep("A", length(A)),
+             rep("B", length(B)))
+)
+
+dat = dat |> mutate(rank = rank(yield))
+dat
+```
+
+```{r}
+
+```
+
+
+```{r}
+w_A = dat |> 
+  filter(method == "A") |> 
+  pull(rank) |> 
+  sum()
+
+sum_dat = dat |>
+  group_by(method) |> 
+  summarise(n = n(),
+            w = sum(rank))
+sum_dat
+```
+
+So $w_y=19$. 
+
+No matter which group you look at, the p-value will be the same. Ecxal same
+9 observation within one group => 5 in one and 4 in one... ??
+
+```{r}
+n_A = sum_dat |> 
+  filter(method == "A") |> 
+  pull(n)
+n_B = sum_dat |> 
+  filter(method == "B") |>
+  pull(n)
+
+# using the sums of the A sample
+w_A = sum_dat |> 
+  filter(method == "A") |> 
+  pull(w)
+ew_A = n_A * (n_A + n_B + 1)/2 
+minw_A = n_A * (n_A + 1)/2  # the other group
+
+# check what the expected value is
+ew_A # = 25
+# and 
+minw_A # = 15
+
+c(minw_A, w_A, ew_A) # w_A > ew_A
+```

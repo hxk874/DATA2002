@@ -8,13 +8,19 @@ date: "2024-09-04"
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+```{r}
+# Load necessary libraries
+library(ggplot2)
+library(tidyr)
+library(tidyverse)
+```
+
+
+
 # Module 2: Testing Means
 
 ## Case 1: small sample size (n=5)
 ```{r}
-# Load necessary libraries
-library(ggplot2)
-
 # Set seed for reproducibility
 set.seed(123)
 
@@ -46,13 +52,11 @@ sum_stats <- combined_df |>
 sum_stats 
 ```
 
+5 observation repeated 10,000 times
+The red plot has some sweeudness 
 
 ```{r}
 ## generate a normal and an exponential (right-skewed distribution)
-
-# Load necessary libraries
-library(ggplot2)
-
 # Set seed for reproducibility
 set.seed(123)
 
