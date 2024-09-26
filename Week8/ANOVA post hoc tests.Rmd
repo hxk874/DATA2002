@@ -1,0 +1,367 @@
+---
+title: "ANOVA post hoc tests"
+output: html_document
+date: "2024-09-16"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(readr)
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+```
+
+# Using residuals to check for normality
+
+## Critical flicker frequency
+
+```{r}
+path = "https://raw.githubusercontent.com/DATA2002/data/master/flicker.txt"
+flicker = read_tsv(path)
+glimpse(flicker)
+```
+Box plot:
+- Initially: 
+    median not equal
+    variance and quantiles kinda the same
+    small dataset
+- conclusion:
+    spread looks reasonable similar 
+    
+Normality:freq as a function of eye colour
+- points looks reasonable close to their diagonal line, which supports the normality assumption
+
+```{r}
+p1 = ggplot(flicker) + aes(x = Colour, y = Flicker) + geom_boxplot() + 
+  labs(y = "Critical flicker frequency", x = "Eye colour")
+p2 = ggplot(flicker) + aes(sample = Flicker) + 
+  geom_qq_line() + geom_qq() + facet_wrap(~ Colour) +
+  theme(axis.text.x = element_blank())
+cowplot::plot_grid(p1, p2, ncol = 2, rel_widths = c(1.1,2),axis = "lrtb", align = "hv")
+```
+
+# Checking for normality with residuals
+
+**If the ANOVA assumptions hold true, then the residuals should be normally distributed.**
+
+Based on the plot the residuals are well aligned on the line, thus the normality assumption holds.
+
+```{r}
+# Flicker (the numeric outcome variable) against colour (the categorical variable)
+flicker_anova = aov(Flicker ~ Colour, data = flicker) # flicker dataset
+
+flicker_resid = flicker_anova$residuals
+
+ggplot(data.frame(flicker_resid)) +
+  aes(sample = flicker_resid) + 
+  geom_qq_line() + geom_qq(size=3)
+```
+
+### Summary statistics
+
+```{r}
+sum_stat = flicker |> group_by(Colour) |>
+  summarise(n_i = n(),
+            ybar_i = mean(Flicker),
+            var_i = var(Flicker))
+sum_stat
+```
+
+```{r}
+n_i = sum_stat |> pull(n_i) # 6 8 5
+
+ybar_i = sum_stat |> pull(ybar_i) # 28.17 25.59 26.92
+
+var_i = sum_stat |> pull(var_i) # 2.33 1.86 3.40 
+```
+
+
+### ANOVA results
+```{r}
+summary(flicker_anova)
+```
+**p-value** = 0.0232 < 0.05
+suggests that we should reject the ANOVA null hypothesis $H_0 : \mu_1 = \mu_2 = \mu_3$ 
+
+We can consider a “contrast” to check which mean is different to the others.
+  In general, there may be more than one “contrast of interest”.
+
+
+
+# Multiple comparisons: simultaneous confidence intervals
+
+"post-hoc" after we have first rejected the ANOVA hypothesis
+
+Methods:
+  $t$-statistics for pairwise diff
+  $t$-based conf interval for the contract
+
+
+## Individual 95% confidence intervals
+$$(\bar{y}_{i\bullet} - \bar{y}_{h \bullet}) \pm t^* \times SE$$
+
+SE for $\bar{y}_{i\bullet} - \bar{y}_{h \bullet}$ is
+$$SE = \hat{\sigma}\sqrt{\frac{1}{n_i} + \frac{1}{n_h}}$$
+where 
+$$\hat{\sigma} = \sqrt{\text{residual MS}}$$
+$$\hat{\sigma}^2=  \frac{\sum(n_i-1) \text{var}_i}{\sum (n_i-1)}$$
+```{r}
+N = length(flicker_resid)
+g = 3
+sig_sq_hat = sum(flicker_resid^2)/(N-g) # Mean square resiudal
+sig_sq_hat # 2.39
+```
+
+```{r}
+# alternatively: sig_sq_hat = sum((n_i - 1) * v_i)/sum(n_i - 1)
+t_star = qt(.975, df = sum(n_i - 1))
+t_star # 2.12
+```
+
+
+Notice that the standard error (`se`) is different depending on thee group. 
+  Reason: $n_i$ is not the same
+  BUT we use the same res variance
+  
+```{r}
+# Blue vs Brown
+se.Bl.Br = sqrt(sig_sq_hat * ((1/n_i[1]) + (1/n_i[2])))
+(int.Bl.Br.95.indiv = ybar_i[1] - ybar_i[2] + c(-1,1) * t_star * se.Bl.Br) # 0.81  4.35
+
+# Blue vs Green
+se.Bl.Gr = sqrt(sig_sq_hat * ((1/n_i[1]) + (1/n_i[3])))
+(int.Bl.Gr.95.indiv = ybar_i[1] - ybar_i[3] + c(-1, 1) * t_star * se.Bl.Gr) # -0.74  3.23
+
+# Green vs Brown
+se.Gr.Br = sqrt(sig_sq_hat*((1/n_i[2]) + (1/n_i[3])))
+(int.Gr.Br.95.indiv = ybar_i[2] - ybar_i[3] + c(-1, 1) * t_star * se.Gr.Br) # -3.20  0.54
+```
+
+conclusion:
+  The only int of these that includes 0 is `Blue vs Brown` / doesn't overlap with 0
+  = "the only significant one" at a 5% level of sig.
+  $0 \notin$ plausible values => reject that $H_0 : \mu$ dff = 0
+
+
+## The emmeans package
+**Estimated marginal mean**
+
+```{r}
+#install.packages("emmeans")
+library(emmeans)
+flicker_anova = aov(Flicker ~ Colour, data = flicker)
+
+# fit the emmeans function to the anova objective. focus on colour factor
+flicker_em = emmeans(flicker_anova, ~ Colour)
+
+# ask for the conf. int.
+confint(flicker_em, adjust = "none")
+```
+
+If you want the pairwise set `method = "pairwise"` and then ask for the `confint()`:
+```{r}
+contrast(flicker_em, method = "pairwise", adjust = "none") |> confint()
+```
+conclusion: same results as the manual calculations before.
+
+### Plot the conf. int. for the indv. colours
+
+```{r}
+confint(flicker_em, adjust = "none") |> plot(colors = "black") + 
+  labs(y = "", x = "Critical flicker frequency")
+```
+
+Pairwise mean difference:
+```{r}
+contrast(flicker_em, method = "pairwise", adjust = "none") |> confint()  |> 
+  plot(colors = "black") + geom_vline(xintercept = 0) + 
+  labs(y = "", x = "Difference in critical flicker frequency")
+```
+
+### Summary of individual intervals
+
+- So it would appear that individually the only “significantly different” pair is Blue and Brown.
+
+- However, we have constructed each interval without taking any regard of the others.
+
+- More precisely:
+    · each interval has been constructed using a procedure so that when the model is correct, the       probability that the “correct” population contrast is covered is 0.95… individually.
+
+- But, what is the probability that all intervals cover their corresponding true values simultaneously?
+
+
+# Bonferroni method
+
+Will give you a bound on the prob
+
+Bonferroni correction =>
+  take out org sig level and you / by #test begin performmed = bounded familywise error rate (conservative) < org level of sig.
+
+
+in practical: Make the individual conf intervals a little bit wider
+conf int that we are interested in: 3
+  the 6: area in upper tail + area in lower tail = so we need to divide by 6/2 in both tails
+area in the RR: 
+$$\frac{\alpha}{2} \cdot \frac{1}{3}=\frac{\alpha}{6}$$
+
+
+```{r}
+# org level of sig: 0.05
+t_simul = qt(1 - (0.05)/6, df = sum(n_i - 1))
+t_simul
+```
+
+
+## Simultaneous (at least) 95% confidence intervals
+same as before without correction
+```{r}
+# Blue vs Brown
+(int.Bl.Br.95.simul = ybar_i[1] - ybar_i[2] + c(-1,1) * t_simul * se.Bl.Br) # 0.35  4.81
+
+# Blue vs Green
+(int.Bl.Gr.95.simul = ybar_i[1] - ybar_i[3] + c(-1,1) * t_simul * se.Bl.Gr) # -1.26  3.75
+
+# Green vs Brown
+(int.Gr.Br.95.simul = ybar_i[2] - ybar_i[3] + c(-1, 1) * t_simul * se.Gr.Br) # -3.69  1.03
+```
+
+
+## Using emmeans package
+where we set `adjust = "bonferroni"`
+```{r}
+flicker_em = emmeans(flicker_anova, ~ Colour)
+confint(flicker_em, adjust = "bonferroni")
+```
+Pairwise differences:
+```{r}
+contrast(flicker_em, method = "pairwise", adjust = "bonferonni") |> confint() 
+```
+### Plots
+```{r}
+confint(flicker_em, adjust = "bonferroni") |> plot(colors = "black") + 
+  labs(y = "", x = "Critical flicker frequency")
+```
+
+```{r}
+contrast(flicker_em, method = "pairwise", adjust = "bonferroni") |> confint()  |> 
+  plot(colors = "black") + geom_vline(xintercept = 0) + 
+  labs(y = "", x = "Difference in critical flicker frequency")
+```
+
+### “Simultaneous” conclusions
+
+- So, even though we “adjusted for multiplicity”, the “Blue–Brown” difference is still significant, in the sense that the corresponding interval does not include zero.
+
+- By increasing the confidence level of each individual comparison, we are able to make “simultaneous” valid statements about them all.
+
+
+
+
+# Multiple comparisons: pairwise $t$-tests
+
+$$t_0 = \frac{\sum_{i=1}^g c_i \bar{y}_{i\bullet}}{ \hat{\sigma} \sqrt{\sum_{i=1}^g c_i^2 / n_i }}$$
+Example with blue vs. brown:
+$$t_0 = \frac{ \bar{y}_{1 \bullet} - \bar{y}_{2 \bullet} }{ \hat{\sigma} \sqrt{1/n_1 + 1/n_2}}$$
+
+
+
+
+Overall p-value from pairwise tests
+
+```{r}
+se.Bl.Br = sqrt(sig_sq_hat * ((1/n_i[1]) + (1/n_i[2])))
+
+# Blue vs Brown
+t_stat.Bl.Br = (ybar_i[1]-ybar_i[2])/se.Bl.Br
+2*(1-pt(abs(t_stat.Bl.Br), df = sum(n_i-1)))
+
+# Blue vs Green
+t_stat.Bl.Gr=(ybar_i[1]-ybar_i[3])/se.Bl.Gr
+2*(1-pt(abs(t_stat.Bl.Gr),df=sum(n_i-1)))
+
+# Brown vs Green
+t_stat.Gr.Br=(ybar_i[2]-ybar_i[3])/se.Gr.Br
+2*(1-pt(abs(t_stat.Gr.Br),df=sum(n_i-1)))
+```
+
+## Using Pairwise  $t$-tests using emmeans
+
+No adjustment
+```{r}
+contrast(flicker_em, method = "pairwise", adjust = "none")
+```
+Bonferroni adjustment (multiply unadjusted p-values by 3)
+```{r}
+contrast(flicker_em, method = "pairwise", adjust = "bonferroni")
+```
+Notice the p-value differences fx. 0.2 to 0.6. 
+
+
+## Overall p-value from pairwise tests
+```{r}
+summary(flicker_anova)
+```
+
+
+# Tukey’s method
+**Honest Significant Differences**: `TukeyHSD()``
+
+- gives you the exact $t^*$ multiplier
+- if you are concerned by pairwise diff 
+     and have same #observations from each pop
+ 
+- doing a one-way ANOVA
+
+```{r}
+contrast(flicker_em, method = "pairwise", adjust = "tukey") |> confint()
+```
+```{r}
+contrast(flicker_em, method = "pairwise", adjust = "tukey")
+```
+
+
+# Scheffé’s method
+
+special multiplier from a F dist that is scaled
+
+applies to all possible contrast.
+Don't need to specify how many pairwise comp you are doing
+  - notice: don't need to be pairwise comp. could be any type of contrast
+
+```{r}
+contrast(flicker_em, method = "pairwise", adjust = "scheffe") |> confint()
+```
+```{r}
+contrast(flicker_em, method = "pairwise", adjust = "scheffe")
+```
+## Plots
+```{r}
+confint(flicker_em, adjust = "scheffe") |> plot(colors = "black")
+```
+
+```{r}
+contrast(flicker_em, method = "pairwise", adjust = "scheffe") |> confint() |> plot(colors = "black") + 
+   geom_vline(xintercept = 0)
+```
+
+# Concluding remarks
+
+• The ANOVA $F$-test alone may or may not address the important scientific questions in each example.
+
+• Depending on the context, a test based on the most significant contrast(s) may be *more* useful than a straight $F$-test.
+
+• Bonferroni procedures are in general conservative i.e. p-values and confidence intervals may be larger than they really need to be.
+  - alternative methods which may be more accurate i.e. less conservative exist: e.g. Tukey’s method.
+
+• Any contrasts must be decided upon **before looking at the data**. Otherwise we are **data snooping**.
+
+• If we “snoop” until we find a significant contrast, we must take account of that:
+  - Scheffé’s method permits unlimited data snooping
+  - If we snoop only across $k$ fixed contrasts e.g. all pairwise comparisons, we can use the Bonferroni method to adjust for that (but for large $k$ Tukey’s method or Scheffé’s method may give smaller intervals).
+
+
+

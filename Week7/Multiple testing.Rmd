@@ -317,15 +317,19 @@ case2 = tibble(experiment = 1:B) |>
 
 
 ```{r}
-# no adjustment
+# 1. row: no adjustment
+# we cooretly rejected all the false H0
 case2 |> tabyl(prediction, truth) |>
   gt::gt()
 
-# Bonferroni: controls FWER 
+# 2. row: Bonferroni: controls FWER 
+# never made any incorrect rejectings
 case2 |> tabyl(pred_bonf, truth) |>
   gt::gt()
 
-# BH: controls FDR 
+# 3. row: BH: controls FDR 
+# we cooretly rejected all the false H0
+# rejected some true H0, when we shouldnot have. 
 case2 |> tabyl(pred_bh, truth) |>
   gt::gt()
 ```

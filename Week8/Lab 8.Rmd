@@ -1,0 +1,103 @@
+---
+title: "Lab 08"
+output: html_document
+date: "2024-09-19"
+---
+
+# Questions
+
+If a light is flickering but at a very high frequency, it appears to not be flickering at all. Thus there exists a “critical flicker frequency” where the flickering changes from “detectable” to “not detectable” and this varies from person to person.
+
+The critical flicker frequency and iris colour for 19 people were obtained as part of a study into the relationship between critical frequency flicker and eye colour.
+
+## Critical Flicker Frequency
+```{r}
+library(tidyverse)
+flicker = read_tsv("https://raw.githubusercontent.com/DATA2002/data/master/flicker.txt")
+glimpse(flicker)
+```
+already in long format
+
+a. Generate side by side box plots as well as normal Q-Q plots for the flicker data. Do your plots support the assumptions required for an ANOVA test to be valid? Explain.
+
+```{r}
+ggplot(flicker, aes(x=Colour,y=Flicker, fill = Colour)) +
+  geom_boxplot()
+```
+
+```{r}
+ggplot(flicker, aes(sample=Flicker)) +
+  geom_qq() + geom_qq_line() + facet_wrap(vars(Colour))
+```
+
+b. Use the `aov()` function to perform an ANOVA test for the equality of means flicker level across each of the three eye colours.
+
+Use the ANOVA workflow provided in the tut solution
+
+c. Using the output, write out the hypothesis test in full. 
+Be sure to state the null and alternative hypothesis, assumptions, test statistic (with distribution), observed test statistic, p-value and an appropriate conclusion.
+
+
+## Blonds
+
+In an investigation into the relationship between tolerance to pain and hair colour, men and women of various ages were divided into 4 groups based on hair colour and given a pain sensitivity test. Each person’s “pain threshold score” (higher score means higher pain tolerance) is recorded in the file blonds.txt.
+
+```{r}
+pain = read_tsv("https://raw.githubusercontent.com/DATA2002/data/master/blonds.txt")
+glimpse(pain)
+```
+
+a. Change HairColour so that the ordering is preserved from lightest to darkest. Hint use: factor()
+
+b. Generate box plots and Q-Q plots to check the ANOVA assumptions.
+
+c. What do the box plots suggest about the null hypothesis that pain thresholds are the same regardless of hair colour?
+
+d. Test this hypothesis formally using ANOVA. Does there seem to be a relationship between hair colour and pain threshold?!
+
+
+Benjamini-H:
+- a lot less conservative, but still is
+- 
+- 
+
+
+
+
+## Hedenfalk data
+
+The package sgof has a data set Hedenfalk (Conde & Una Alvarez, 2020). You may need to install.packages("sgof"). 
+```{r}
+install.packages("sgof")
+```
+
+Use ?Hedenfalk to find out more about this data set.
+
+a. How many p-values are in the data set?
+
+Res:
+
+- Bon: p-value * num of test
+    - very conservative
+    - Cap at 1 mark, since dens cannot > 1
+- Benjamin:
+    - less conservative
+    
+
+
+
+b. Generate a histogram of the (unadjusted) Hedenfalk p-values.
+
+c. How many (unadjusted) p-values are significant at the 5% level of significance? What proportion of all p-values in the data set is this?
+
+d. Why is it a good idea to consider adjusted p-values?
+
+e. Using p.adjust() find the Bonferroni and BH p-values. Plot histograms of each and find the number of significant results after adjustment for both.
+
+f. Comment on the difference between the Bonferroni method and the BH method.
+
+
+
+
+
+

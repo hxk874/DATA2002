@@ -1,0 +1,161 @@
+---
+title: "Linear regression"
+output: html_document
+date: "2024-09-23"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# Module 4: learning and prediction
+
+
+# Regression
+
+## Air pollution
+
+The data frame environmental has four environmental variables ozone, radiation, temperature and wind taken in New York City from May to September of 1973.
+
+```{r}
+library(tidyverse)
+data("environmental", package = "lattice")
+# ?environmental
+glimpse(environmental)
+```
+We’d like to assess whether the maximum daily temperature has an influence on average ozone concentration.
+
+```{r}
+p = ggplot(environmental) + aes(x = temperature, y = ozone) + 
+  geom_point(size = 3, alpha = 0.6) + 
+  labs(x = "Temperature (°F)", y = "Ozone concentration\n(parts per billion)")
+p
+
+p + geom_smooth(method = "lm", se = FALSE)
+```
+
+
+
+```{r}
+lm1 = lm(ozone ~ temperature, 
+         data = environmental)
+lm1
+```
+Our estimated model is:
+$$\hat{\text{ozone}} =-147.646 + 2.439 \times \text{temp}$$
+
+
+### Fitted values and residuals
+
+The fitted values ($\hat{y}$) are obtained by plugging the observed predictor ($x$) values into our estimated model, $\hat{y}_i = \hat{\beta}_0 + \hat{\beta}_1 x_i$.
+```{r}
+environmental = environmental |> 
+  mutate(
+    fitted = -147.646 + 2.439 * temperature
+  )
+```
+
+
+The residuals are the differences between the observed outcome variable ($y$) and the value the estimated model predicts for that observation (the fitted value, $\hat{y}$),
+$$r_i = y_i - \hat{y}_i$$
+
+```{r}
+environmental = environmental |> 
+  mutate(
+    resid = ozone - fitted
+    )
+```
+
+An easier alternative is to extract the residuals and fitted values from the lm1 object directly:
+```{r}
+environmental = environmental |> 
+  mutate(
+    resid = lm1$residuals,
+    fitted = lm1$fitted.values
+  )
+```
+
+Alternatively we could have used the augment() function from the broom package to do this:
+```{r}
+broom::augment(lm1) |> glimpse()
+```
+
+
+### The lm object
+
+```{r}
+# What other hidden treasures does the lm1 object hold?
+names(lm1)
+
+# E.g. we can extract the coefficients:
+lm1$coefficients
+
+# Or we can use the tidy() function from the broom package:
+lm1 |> broom::tidy()
+```
+
+
+# Checking assumptions
+
+## Linear regression assumptions
+
+There are 4 assumptions underling our linear regression model:
+ 1. Linearity - the relationship between $Y$ and $x$is linear
+ 2. Independence - all the errors are independent of each other
+ 3. Homoskedasticity - the errors have constant variance Var$(\varepsilon_i) = \sigma^2$ for all $i=1,...n$.
+ 4. Normality - the errors follow a normal distribution
+
+The last three can be written succinctly as $\varepsilon_i \sim$ iid $N(0,\sigma^2)$.
+
+### Linearity
+
+```{r}
+p1 = environmental |> ggplot() + 
+  aes(x = temperature, y = ozone) + 
+  geom_point(size = 3) + 
+  labs(x = "Temperature (°F)",
+       y = "Ozone concentration") +
+  geom_smooth(method="lm", se=FALSE)
+p1
+
+p2 = environmental |> ggplot() + 
+  aes(x = temperature, y = resid) + 
+  geom_point(size = 3) + 
+  labs(x = "Temperature (°F)",
+       y = "Residual") +
+  geom_hline(yintercept = 0)
+p2
+```
+
+In the plot below the residuals are above zero for low temperatures, then they go below zero and end up again above zero for high temperatures (as highlighted by the local smoothing curve).
+```{r}
+p2 + geom_smooth(method = "loess", 
+                 se = FALSE)
+```
+
+**Transformations**
+
+If we see a non-linear relationship between $y$ and $x$ we might be able to transform the data so that we have a linear relationship between the transformed variable(s).
+What if we considered the log of ozone concentration?
+```{r}
+p1 + scale_y_log10()
+```
+
+
+# Interpreting model coefficients
+
+
+# Inference in regression models
+
+
+# In-sample performance
+
+# Multiple regression
+
+
+
+
+
+
+

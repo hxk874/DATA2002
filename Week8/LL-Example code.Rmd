@@ -1,0 +1,231 @@
+---
+title: "LL-Example code"
+output: html_document
+date: "2024-09-19"
+---
+
+## Skin resistance data
+
+```{r, message = FALSE}
+library(tidyverse)
+resist = read_tsv("https://raw.githubusercontent.com/DATA2002/data/master/resist.txt")
+glimpse(resist)
+# convert Subject from integer to factor
+resist$Subject = factor(resist$Subject) 
+```
+
+```{r}
+# y form -> long form data columns
+resist_long = resist |> 
+  pivot_longer(cols = E1:E5, # stack all the y columns (electrode)
+               names_to = "electrode", # rename
+               values_to = "resistance") # actual numbers
+glimpse(resist_long)
+```
+2 catagorical and 1 numeric
+
+**Linear scale**
+
+```{r}
+p1 = ggplot(resist_long) + 
+  # categorical + numeric
+  aes(y = electrode, x = resistance) + 
+  geom_boxplot() 
+p1
+```
+
+What assumptions might not hold? 
+- $\neq$ var
+    : reasonable close. 
+- median is skewed
+    : somewhat right skewed 
+      issue iif you dont havee a laarge enough sample for the ANOVA
+
+
+
+**Log scale**
+
+```{r}
+# extract the previous gg plot and rescale it. 
+p1 + scale_x_log10() 
+```
+
+```{r}
+resist_long = resist_long |> 
+  mutate(
+    y = log(resistance)
+  )
+# alternatively
+# resist_long$y = log(resist_long$resistance)
+```
+
+### One way ANOVA
+
+```{r}
+fit1 = aov(y ~ electrode, data = resist_long)
+summary(fit1)
+```
+
+p-value = 0.21 > 0.05 => do not reject the null hypothesis that there may bee a difference between between the electrode types and/or between the subjects.
+
+
+### Two way ANOVA
+
+We can add Subject as an extra factor variable in our formula to indicate that it
+should be used to help “explain” y. The formula that we use in the aov() is now: 
+  `y ~ Subject + electrode`
+
+We get an extra line in the ANOVA table: `Subject`:
+```{r}
+fit2 = aov(y ~ Subject + electrode, data = resist_long)
+summary(fit2)
+```
+which results in a lower p-value = 0.05 = significance level. Though we still cannnot quite reject $H_0$. 
+
+**Comparison**:
+- df is lower, some degrees has gone from the res to sub (75-15=60). 
+
+- RSS: from 63.48 to 30.21. given from RSS to Subject SS. which means that we have accountet for the indv. subjects. 
+
+- gives more precise Res MS. 
+
+
+
+### Pairwise comparisons
+
+**Bonferroni**
+
+
+bonferroni: 
+org sig / # test $\binom{g}{2}$ ~p-value
+p-value * # obs
+```{r, message = FALSE}
+library(emmeans)
+# the emmeans broken down by the electrode mean
+fit2_emmeans = emmeans(fit2, ~ electrode)
+# pairwise means
+contrast(fit2_emmeans, 
+         method = "pairwise", # type of contrast
+         adjust = "bonferroni") # type of adjustment
+```
+the only one that came close to sig: E2 - E4
+
+remeber: org ANOVA p-value was just 0.05.
+
+10 test =  $\binom{5}{2}$ 
+
+```{r, fig.height=6}
+contrast(fit2_emmeans, method = "pairwise", adjust = "bonferroni") |> 
+  plot() + geom_vline(xintercept = 0) 
+```
+
+
+**Tukey's**
+
+```{r}
+contrast(fit2_emmeans, 
+         method = "pairwise", 
+         adjust = "tukey")
+```
+method less conservative
+smaller p-value, but still > 0.05.
+
+
+```{r, fig.height=6}
+contrast(fit2_emmeans, method = "pairwise", adjust = "tukey") |> 
+  plot() + geom_vline(xintercept = 0) 
+```
+
+
+```{r}
+contrast(fit2_emmeans, method = "pairwise", adjust = "tukey") |> confint()
+```
+
+**Scheffe's method**
+
+```{r}
+contrast(fit2_emmeans, method = "pairwise", adjust = "scheffe")
+```
+
+```{r, fig.height=6}
+contrast(fit2_emmeans, method = "pairwise", adjust = "scheffe") |> 
+  plot() + geom_vline(xintercept = 0) 
+```
+
+```{r}
+names(fit2)
+```
+
+
+### Checking assumptions
+
+The `fitted.values` and `residuals` can be extracted from the **aov** object:
+
+```{r}
+resist_long = resist_long |> 
+  mutate(fitted = fit2$fitted.values,
+         resid = fit2$residuals)
+# or using 
+broom::augment(fit2)
+```
+
+Can use the `autoplot()` function from the **ggfortify** package.
+
+it takes your object, and generates relevant plots:
+- bunch of plots in the background, tell it how many you want. 
+```{r, warning = FALSE}
+library(ggfortify) # plots will also be used in the final exam
+autoplot(fit2, which = 1:2)
+```
+Res (left):
+- looks pretty good, spreed roughly the same 
+- regression: skyadrastic ??
+- possible lack of symmetry (skewness) due to the points in the bottom 
+    which you can also see on the QQ 
+
+Normality (right):
+- properly fine
+exam: points reasonable close to diag line. departuree in the top - though okay
+  + sig large number of obs -> CLT will kick in
+  
+
+
+### Friedman test
+
+```{r}
+friedman.test(resistance ~ electrode | Subject, data = resist_long) # org data
+friedman.test(y ~ electrode | Subject, data = resist_long)
+```
+
+
+We can also use a simulation/permutation approach to obtain a p-value:
+
+```{r, echo=-1}
+set.seed(12345)
+fried.stat = friedman.test(y ~ electrode | Subject, data = resist_long)$statistic
+B = 1000
+fr.st = vector("numeric", length = B)
+for(i in 1:B) {
+  fr.st[i] = friedman.test(sample(y) ~ electrode | Subject, data = resist_long)$statistic
+}
+mean(fr.st>=fried.stat) # as or more extreme as our test statistic
+```
+
+
+
+```{r, echo=-1}
+par(cex = 2, mar = c(4,4,2,0.5))
+hist(fr.st, breaks = 25, probability = TRUE, col = "lightblue")
+curve(dchisq(x, 4), col = "red", add = TRUE, lwd = 3)
+```
+
+What if we used the original data (not the log data)?
+to the Friedman test...
+- since it is a non.parametric (doesn't assume a specif dist) => does not matter
+- further important: ranks stays the same no matter the monitering transformation 
+
+Same result:
+```{r}
+friedman.test(resistance ~ electrode | Subject, data = resist_long) # org data
+friedman.test(y ~ electrode | Subject, data = resist_long)
+```

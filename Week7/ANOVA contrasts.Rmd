@@ -1,6 +1,6 @@
 ---
-title: "ANOVA - yield"
-date: "2024-09-09"
+title: "Live Lecture: ANOVA contrasts"
+date: "2024-09-12"
 author: "Ellen Ebdrup"
 output: 
   html_document: 
@@ -24,10 +24,9 @@ library(tidyverse)
 library(ggplot2)
 ```
 
-# ANOVA
 **Analysis of Variance**
 
-## Plant Growth
+# Plant Growth
 The PlantGrowth data has results from an experiment to compare yields (as measured by dried weight of plants) obtained under a control and two different treatment conditions
 
 We want to compare the means of the three different groups, the control, treatment 1 and treatment 2 groups.
@@ -43,5 +42,103 @@ PlantGrowth |> ggplot() +
   theme(legend.position = "none") +
   labs(y = "Weight (g)", x = "Group")
 ```
+
+hasn't put in a total row, but you could add that yourself
+F statistic: ratio between Mean Sq of 'group' and 'Residuals'
+```{r}
+plant_anova = aov(weight ~ group, data = PlantGrowth)
+summary(plant_anova)
+```
+## Yield
+```{r}
+plant_summary = PlantGrowth |>
+mutate(group = factor(group, levels = c("trt1","trt2", "ctrl"))) |>
+group_by(group) |>
+summarise(n = n(), mean_weight = mean(weight)) |>
+mutate(contrast_coefficients = c(1,
+-1, 0),
+c_ybar = mean_weight * contrast_coefficients)
+plant_summary
+```
+# two-sampl between treatment 1 and 2
+```{r}
+# estimated pairwise contrast:
+sum(plant_summary$c_ybar) # sample contrast
+```
+
+## Residual standard error
+
+```{r}
+plant_anova = aov(weight ~ group, data = PlantGrowth)
+summary(plant_anova)
+```
+$$\hat{\sigma}^2 = 0.3886$$
+```{r}
+library(broom)
+# handy to convert ANOVA table to df
+tidy(plant_anova) # makes a df st you can extract data with df$x
+```
+
+```{r}
+resid_ms = tidy(plant_anova)$meansq[2]
+resid_ms
+
+resid_se = sqrt(resid_ms)
+resid_se
+```
+
+### Calculating the test statistic
+
+$$H_0 : \mu_1 - \mu_2 = 0$$
+Finding the quantiles.
+```{r}
+qt(c(.025, .975), df=27) 
+```
+
+
+```{r}
+(n_i = plant_summary |> pull(n)) # 10 10 10
+
+(ybar_i = plant_summary |> pull(mean_weight)) # 4.661 5.526 5.032
+
+(c_i = plant_summary |> pull(contrast_coefficients)) # 1 -1 0
+
+(se = sqrt(resid_ms * sum((c_i^2) / n_i))) # 0.2787816
+
+# observed test statistic
+(t_stat = sum(c_i * ybar_i)/se) # -3.1
+```
+
+Reject or don't reject?
+
+We would reject, since 
+at a 5% significance, with a $t_{27}$-dist and anything outside [-2,2] you would rejct.
+This means that the rejecting region is: 
+$$RR = (-\infty , -2.05] \cup [2.05, \infty)$$  
+### Calculating the p-value
+
+```{r}
+plant_anova$df.res
+
+2*pt(abs(t_stat), df = plant_anova$df.res, lower.tail = FALSE)
+```
+
+### “Observed value” of confidence interval
+
+=> Reject the $H_0$
+
+```{r}
+# the “multiplier” is determined via:
+t_star = qt(0.975, df = 27)
+t_star
+
+# the interval is obtained using
+sum(c_i * ybar_i) + c(-1,1) * t_star * se
+```
+
+
+
+
+
 
 

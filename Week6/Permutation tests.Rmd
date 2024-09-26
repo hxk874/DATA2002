@@ -136,6 +136,9 @@ We want to compare the control group to the treatment 2 group.
 ```
 
 ### Checking for normality: Q-Q plot
+reasonably close
+Properly fine. 
+two normal populations
 
 ```{r}
  dat |> 
@@ -146,6 +149,8 @@ We want to compare the control group to the treatment 2 group.
 ```
 
 ### What do our “standard” methods say?
+
+Thee Wilcoxon R-∑ test has a little bit of a larger p-value than the $t$-test: $0.063 > 0.047$. 
 
 Two-sample t-test
 ```{r}
@@ -159,25 +164,28 @@ wilcox.test(weight ~ group, data = dat)
 
 Extracting information from t.test objects
 ```{r}
-tt = t.test(weight ~ group, data = dat, var.equal = TRUE)
-tt
+(tt = t.test(weight ~ group, data = dat, var.equal = TRUE))
 
-names(tt)
-
-tt$statistic
+names(tt) # name of all the parameters/results from test.
+tt$statistic # pick this one for the t statistic
 ```
 
 
 ### Permutation test
 
 
-Permute class labels (many times). See what values we get for the t-test statistic.
+
+Permute class labels (many times) => we end up destroying any structure, there might have been in the org data set => we generate test statistic knowing that the $H_0$ is true and therefore that there is no difference between the treatment and control group. 
+
+See what values we get for the t-test statistic.
 ```{r}
 B = 10000 # number of permuted samples we will consider
 permuted_dat = dat # make a copy of the data
 t_null = vector("numeric", B) # initialise outside loop
 for(i in 1:B) {
-  permuted_dat$group = sample(dat$group) # this does the permutation
+  # the group col is a sample from org dataset
+  permuted_dat$group = sample(dat$group) # this does the permutation = resampling the group
+  # shuffling thee labels => no diff the control and the treatment because fo the randomness in suffling
   t_null[i] = t.test(weight ~ group, data = permuted_dat)$statistic
 }
 ```
@@ -207,64 +215,162 @@ data.frame(abs_t_null = abs(t_null)) |>
 
 What proportion of test statistics from randomly permuted data are more extreme than the test statistic we observed?
 ```{r}
-mean(abs(t_null) >= abs(tt$statistic))
+mean(abs(t_null) >= abs(tt$statistic)) # This is our permutation test p-value.
 ```
-This is our permutation test p-value.
 
+ 
+## Latent heat of fusion
 
-# Permutation test: paired samples
+Natrella (1963, pp. 3–23) presents data from two methods that were used in a study of the latent heat of fusion of ice. Both method A (digital method) and method B (method of mixtures) were conducted with the specimens cooled to -0.72°C. The data represent the change in total heat from -0.72°C to water at 0°C, in calories per gram of mass.
 
-For paired tests: think difference $d_i=x_i - y_i$
-and then the test is the $sign(d_i)$
+• Does the data support the hypothesis that the electrical method (method A) gives larger results?
 
-
-## Smoking
-
-Blood samples from 11 individuals before and after they smoked a cigarette are used to measure aggregation of blood platelets.
-Is the aggregation affected by smoking?
 ```{r}
-before = c(25, 25, 27, 44, 30, 67, 53, 53, 52, 60, 28)
-after =  c(27, 29, 37, 36, 46, 82, 57, 80, 61, 59, 43)  
-d = after - before
-t.test(d)
+A = c(79.98, 80.04, 80.02, 80.04, 80.03, 80.03, 80.04, 
+      79.97, 80.05, 80.03, 80.02, 80.00, 80.02)
+B = c(80.02, 79.94, 79.98, 79.97, 79.97, 80.03, 79.95, 
+      79.97)
+heat = data.frame(energy = c(A,B),
+  method = rep(c("A","B"), c(length(A), length(B)))
+)
 ```
 
 
 
 ```{r}
-# Different permutations of sign of 11 d_i.
-sign_permute = permutations(c(-1,1), 11, replace = TRUE)
-dim(sign_permute)
-
-head(sign_permute)
+heat |> ggplot() + 
+  aes(x = method, y = energy) + 
+  geom_boxplot(coef = 10) + 
+  geom_dotplot(stackdir = "center", binaxis = "y") +
+  labs(y = "Heat of fusion (cal/g)", x = "Method")
 ```
 
-$$t_0=\frac{\mu}{sd \times \sqrt{n}}$$
+We havenot assumed equal variance
 ```{r}
-# org test statistic
-(t0_original = mean(d)/sd(d)*sqrt(length(d)))
+tt = t.test(energy ~ method, data = heat, alternative = "greater")
+tt
+
+t0_original = tt$statistic
+t0_original
 ```
 
-
-
+• How many permutations of the class label are there?
 ```{r}
+n = nrow(heat)
+n
 
-n = length(d)
-B = nrow(sign_permute) # all different sign
-t_null = vector("numeric", B)
+factorial(n)
 
-for(i in 1:nrow(sign_permute)){
-  d_permute = d*sign_permute[i,] # permuted difference vector: org diff * permuted signs
-  t_null[i] = mean(d_permute)/sd(d_permute)*sqrt(n) # test static under this null dist
+#english::words(factorial(n))
+```
+Fifty one quintillion ninety quadrillion nine hundred forty-two trillion one hundred seventy-one billion seven hundred nine million four hundred forty thousand
+
+### Permutation test p-value
+```{r}
+B = 10000 # number of permuted samples we will consider
+permuted_heat = heat # make a copy of the data
+t_null = vector("numeric", B) # initialise outside loop
+for(i in 1:B) {
+  permuted_heat$method = sample(heat$method) # this does the permutation
+  t_null[i] = t.test(energy ~ method, data = permuted_heat)$statistic
 }
+mean(t_null>=t0_original)
+```
 
-# two taail type setting
-mean(abs(t_null) >= abs(t0_original))
+• Why didn’t we need to specify alternative = "greater" in the t.test() function?
+because we don't need to worry about the P-value under the hood. We are just interested in the test statistic
+
+
+```{r}
+perm_heat = heat 
+perm_heat$id = 1
+for(i in 2:6){
+  temp = heat
+  temp$method = sample(temp$method)
+  temp$id = i
+  perm_heat = rbind(perm_heat, temp)
+}
+perm_heat |> 
+  group_by(id) |> 
+  summarise(
+    t_stat = t.test(
+      energy[method=="A"], 
+      energy[method=="B"])$statistic
+  )
+```
+
+What is going on under the hood?
+```{r}
+perm_heat |> ggplot() +
+  aes(x = method, y = energy) + 
+  geom_boxplot(coef = 10) + 
+  scale_y_continuous(n.breaks = 3) + 
+  facet_wrap(vars(id), ncol = 6) + 
+  labs(y = "Heat of fusion (cal/g)",
+       x = "Method")
+```
+
+
+
+```{r}
+t_null |> data.frame() |> ggplot() + aes(x = t_null) + 
+  geom_histogram(alpha=0.5) + 
+  geom_vline(xintercept = t0_original, colour = "red", linetype = "dashed") + 
+  geom_text(aes(x = t0_original, label = "Original test statistic", y = Inf), 
+            colour = "red", angle = 90, hjust = 1, vjust = -1, size = 7) + 
+  labs(x = "Test statistics from permuted samples", y = "Count")
+```
+
+### What about outliers?
+What happens if there is an outlier in the data?
+
+# pov: there is a big outlier 80.2 : see plot below
+Below we change the first value for the B method from 80.02 to 80.20.
+
+```{r}
+heat1 = heat
+heat1$energy[14]
+
+# edit 80.02 -> 80.20 to introduce an outlier
+heat1$energy[14] = 80.20 
 ```
 
 ```{r}
-# org test statictis
-t.test(d)$p.value
+ggplot(heat1) + 
+  aes(x = method, y = energy) + 
+  geom_boxplot() + 
+  geom_dotplot(stackdir = "center",
+               binaxis = "y") +
+  labs(y = "Heat of fusion (cal/g)",
+       x = "Method")
+```
+
+
+### Our “standard” test results
+
+The more roobust Wilcoxon test tell us that we shout reject $H_0$: 0.019 < 0.05
+```{r}
+wilcox.test(energy ~ method, data = heat1, 
+            alternative = "greater", correct = FALSE)
+```
+The two-sample t-test is no longer rejecting the $H_0$ hypothesis: 0.27 > 0.05
+```{r}
+t.test(energy ~ method, data = heat1, alternative = "greater")
+```
+
+### Permutation test using the Wilcoxon rank-sum statistic
+
+```{r}
+t0_original = wilcox.test(energy ~ method, data = heat1)$statistic
+set.seed(1234)
+B = 10000
+permuted_heat1 = heat1
+t_null = vector("numeric", B)
+for(i in 1:B){
+  permuted_heat1$method = sample(heat1$method)
+  t_null[i] = wilcox.test(energy ~ method, data = permuted_heat1, verbose=False)$statistic
+}
+mean(t_null >= t0_original)
 ```
 
 
