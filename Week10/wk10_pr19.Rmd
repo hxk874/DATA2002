@@ -1,0 +1,134 @@
+---
+title: "wk10_pr19: Model Selection"
+output: html_document
+date: "2024-10-09"
+---
+
+```{r}
+data("UScrime", package = "MASS")
+# ?UScrime
+dim(UScrime)
+```
+
+```{r}
+data("UScrime", package = "MASS")
+dim(UScrime)
+```
+
+```{r}
+n = 47
+k = 15
+2^k
+```
+
+```{r}
+cor_mat = cor(UScrime)
+melted_cor_mat = cor_mat |>
+  data.frame() |> 
+  rownames_to_column(var = "var1") |> 
+  pivot_longer(cols = -var1, 
+               names_to = "var2",
+               values_to = "cor")
+```
+
+```{r}
+melted_cor_mat |> ggplot() + 
+  aes(x=var1, y=var2, fill=cor) + 
+  geom_tile() + 
+  theme_minimal(base_size = 10) +
+  scale_fill_gradient2(
+    low = "blue", 
+    high = "red", 
+    mid = "white", 
+    midpoint = 0, 
+    limit = c(-1,1)) +
+  theme(
+    axis.text.x = element_text(
+      angle = 90, hjust = 1
+    )
+  )
+```
+
+```{r}
+#install.packages("qtlcharts")
+qtlcharts::iplotCorr(UScrime)
+```
+
+```{r}
+M0 = lm(y ~ 1, data = UScrime)  # Null model
+M1 = lm(y ~ ., data = UScrime)  # Full model
+round(summary(M1)$coef, 3)
+```
+
+```{r}
+res = bind_rows(broom::glance(M1), 
+                broom::glance(M0))
+res$model= c("M1","M0")
+res |> pivot_longer(
+  cols = -model, 
+  names_to = "metric", 
+  values_to = "value") |> 
+  pivot_wider(
+    names_from = "model") |> 
+  gt::gt() |> 
+  gt::fmt_number(columns = 2:3, 
+                 decimals = 2) |> 
+  gt::fmt_missing()
+```
+
+
+# Stepwise selection
+
+## Backward
+```{r}
+step.back.aic = step(M1, 
+                     direction = "backward", 
+                     trace = FALSE)
+round(summary(step.back.aic)$coef,3)
+```
+
+```{r}
+step.back.aic |>
+  broom::glance() |> 
+  round(2) |> t()
+```
+
+## Forward
+```{r}
+M0 = lm(y ~ 1, data = UScrime)  # Null model
+M1 = lm(y ~ ., data = UScrime)  # Full model
+step.fwd.aic = step(M0, scope = list(lower = M0, upper = M1),
+                    direction = "forward", trace = FALSE)
+summary(step.fwd.aic)
+```
+
+## Comparing
+```{r}
+sjPlot::tab_model(step.fwd.aic, step.back.aic, show.ci = FALSE, show.aic = TRUE,
+                  dv.labels = c("Forward model", "Backward model"))
+```
+
+
+# Exhaustive searches
+
+## Leaps package
+pretty old package
+
+```{r}
+library(leaps)
+# y~ : full model
+# nvmax : maximum number of variables to consider in the model
+exh_leaps = regsubsets(y~., data = UScrime, nvmax = 15)
+summary(exh_leaps)$outmat
+```
+
+## lmSubsets package
+
+slighty nicer and newer package
+```{r}
+library(lmSubsets)
+exh = lmSubsets(y ~ ., data = df, nbest = 15)
+plot(exh)
+```
+
+

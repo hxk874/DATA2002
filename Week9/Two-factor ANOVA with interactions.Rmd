@@ -380,7 +380,7 @@ First, we check the “big 1-way ANOVA”:
 summary(aov(Distance ~ Paper:Plane, data = planes))
 ```
 Results:
-- p-value of the biig 1-way ANOVA = 0.001 < 0.05 => re would reject that all comb has the same mean.
+- p-value of the big 1-way ANOVA = 0.001 < 0.05 => re would reject that all comb has the same mean.
 - There is a strong Treatment effect.
 
 Now we partition the treatment sum of squares into main effects and interactions:

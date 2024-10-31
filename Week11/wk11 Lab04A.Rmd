@@ -1,0 +1,270 @@
+---
+title: "Lab 04A: Week 11"
+output: html_document
+date: "2024-10-17"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Questions
+
+## Wind
+
+The data in `pollut.txt` are `WS` (wind speeds), `Temp` (temperature), `H` (humidity), `In`(insolation) and `O` (ozone) for 30 days.
+
+```{r}
+pollut = read_csv("https://raw.githubusercontent.com/DATA2002/data/master/pollut.txt")      
+glimpse(pollut)
+```
+
+1. **Generate a pairs plot of the data using pairs() or the ggpairs() function from the GGally package (Schloerke et al., 2021).**
+
+```{r}
+# pairs(pollut)
+library(GGally)
+ggpairs(pollut) + theme_bw()
+```
+
+
+2. **Perform a multiple regression of ozone on the other variables using lm().**
+
+```{r}
+pollut_lm = lm(O ~ ., pollut)
+# Or
+# pollut_lm = lm(O ~ WS + Temp + H + In, pollut)
+summary(pollut_lm)
+```
+
+
+3. **Does it look like any variables can be dropped from the model? If you were doing backwards selection using the drop1() function which would you drop first? Write down a the workflow for a formal hypothesis test to see if the coefficient for insolation is significantly different to zero.**
+
+Yes, both humidity and insolation are individually insignificant at the 5% level of significance. We can’t immediately drop both of them from the model as the p-values are only testing individual coefficients. If we were to drop one first, we would drop insolation as it has the largest p-value.
+
+We can do a formal test to see if the coefficient of insolation is significant as follows.
+
+First we define the model with population parameters:
+$$O= \beta_0 + \beta_1 WS + \beta_2 Temp +\beta_3 H + \beta_4 In + \varepsilon$$
+Hypothesis: $H_0 : \beta_4 = 0$ vs. $H_1 : \beta_4 \neq 0$ 
+
+Assumptions: The residuals $\varepsilon_i$ are iid $N(0, \sigma^2)$ and there is a linear relationship between $y$ and $x$.
+
+```{r}
+library(ggfortify)
+autoplot(pollut_lm, which = 1:2) + theme_bw()
+```
+
+- **Linearity*: there’s no obvious pattern in the residual vs fitted values plot (e.g. no smiley face of frowny face) so it doesn’t appear that we have misspecified the model
+
+- **Homoskedasticity**: the residuals don’t appear to be fanning out or changing their variability over the range of the fitted values so the constant error variance assumption is met.
+
+- **Normality**: in the Q-Q plot, the points are reasonably close to the diagonal line. The bottom 7 or so points are not quite on the line, but it’s not severe enough departure to cause too much concern. The normality assumption is at least approximately satisfied.
+
+Test statistic: 
+$$T=\frac{\hat{\beta}_4}{SE(\hat{\beta}_4)} \sim t_{n-p} \text{ under } H_0 $$
+ where $p$ is the number of estimated coefficients (including the intercept) and  is the sample size. This is also the degrees of freedom associated with the residual standard error in the R output (i.e. 25).
+
+Observed test statistic: 
+$$t_0 = \frac{0.02275}{0.05067} = 0.449$$
+
+p-value: 
+$$2P(t_{25} \geq |0.449|) = 0.65728$$
+
+Conclusion: Do not reject $H_0$ at the 5% level of significance as the p-value is greater than 0.05. Hence, there is no evidence to suggest that there is a significant linear relationship between ozone and insolation after accounting for the other variables in the model and it can be dropped from the model.
+
+4. **Rather than dropping variables using their individual p-values, we can instead consider using an information criterion. Use the step() function to perform selection using the AIC starting from the full model.**
+
+```{r}
+pollut_step = step(pollut_lm)
+```
+
+```{r}
+pollut_step
+```
+
+
+5. **Write down the fitted model for the model selected by the step-wise procedure.**
+
+$$\hat{Ozone} = -16.6070 - 0.4462WS + 0.6019 Temp + 0.0985 Humidity$$
+
+6. **Check the linear regression assumptions for the stepwise model.**
+
+```{r}
+library(ggfortify)
+autoplot(pollut_step, which = 1:2) + theme_bw()
+```
+
+- Linearity: there’s no obvious pattern in the residual vs fitted values plot (e.g. no smiley face of frowny face) so it doesn’t appear that we have misspecified the model
+
+- Homoskedasticity: the residuals don’t appear to be fanning out or changing their variability over the range of the fitted values so the constant error variance assumption is met.
+
+- Normality: in the Q-Q plot, the points are reasonably close to the diagonal line. The bottom 7 or so points are not quite on the line, but it’s not severe enough departure to cause too much concern. The normality assumption is at least approximately satisfied.
+
+7. **What proportion of the variability of ozone is explained by the explanatory variables in the step-wise selected model?**
+
+```{r}
+summary(pollut_step)
+```
+
+Looking at the $R^2$ value (multiple R-squared) from the summary output, 80% of the variability of ozone is explained by the regression on wind speed, temperature and humidity.
+
+8. **Use the model to estimate the average ozone for days when WS=40, Temp=80 and H=50. Is a confidence interval or a prediction interval most appropriate here? Write down the interval you think is most appropriate.**
+
+```{r}
+newdata = data.frame(WS = 40, Temp = 80, H = 50)
+predict(pollut_step, newdata, interval = "confidence")
+```
+
+```{r}
+predict(pollut_step, newdata, interval = "prediction")
+```
+
+Using the regression, the estimate average ozone for days when WS=40, Temp=80 and H=50 is 18.62.
+
+A confidence interval is more appropriate here, because the question asked about estimating the average ozone on days when…..
+
+If instead the question asked: predict the ozone on a day when… we’d use a prediction interval instead.
+
+The 95% confidence interval for the estimated ozone level is (16.71, 20.54).
+
+
+## Diabetes
+
+Efron et al. (2004) introduced the diabetes data set with 442 observations and 11 variables. It is often used as an exemplar data set to illustrate new model selection techniques. The following commands will help you get a feel for the data.
+
+```{r}
+# install.packages("mplot")
+data("diabetes", package = "mplot")
+# help("diabetes", package = "mplot")
+```
+
+```{r}
+glimpse(diabetes) # glimpse the structure of the diabetes
+pairs(diabetes) # traditional pairs plot
+GGally::ggpairs(diabetes) # ggplotified pairs plot
+boxplot(diabetes) # always a good idea to check for gross outliers
+boxplot(scale(diabetes)) # always a good idea to check for gross outliers
+```
+
+```{r}
+# OPTIONAL!!
+# install.packages(c("pairsD3", "heatmaply", "skimr"))
+pairsD3::shinypairs(diabetes) # interactive pairs plot of the data set
+heatmaply::heatmaply(cor(diabetes))
+skimr::skim(diabetes) # summary of the diabetes data
+```
+
+We can fit the null model (without any variables) and the full model as follows:
+
+```{r}
+M0 = lm(y ~ 1, data = diabetes)  # Null model
+M1 = lm(y ~ ., data = diabetes)  # Full model
+```
+
+Table 1 shows the estimated models side by side using the modelsummary package (Arel-Bundock, 2022).
+
+```{r}
+modelsummary::modelsummary(list("Null model" = M0, "Full model" = M1),
+                           estimate = "{estimate} ({std.error})",
+                           statistic = "{p.value}")
+```
+
+1. **Try doing backward selection using AIC first.**
+```{r}
+step_back_aic = step(M1, direction = "backward", trace = FALSE)
+summary(step_back_aic)
+```
+
+2. **Explore the forwards selection technique, which works very similarly to backwards selection, just set direction = "forward" in the step() function.** 
+When using direction = "forward" you need to specify a scope parameter: scope = list(lower = M0, upper = M1).
+
+```{r}
+step_fwd_aic = step(M0, scope = list(lower = M0, upper = M1), 
+                    direction = "forward", trace = FALSE) 
+summary(step_fwd_aic)
+```
+
+3. **Try using the add1() and drop1() functions.**
+The general form is add1(fitted.model, test = "F", scope = M1) or drop1(fitted.model, test = "F")
+
+```{r}
+add1(step_fwd_aic, test = "F", scope = M1)
+```
+
+```{r}
+drop1(step_fwd_aic, test = "F")
+```
+
+4. **What if you try backwards selection using an individual p-value approach, i.e. using drop1() from the full model.**
+
+```{r}
+drop1(M1, test = "F")
+```
+
+```{r}
+M2 = update(M1, .~.-age)
+drop1(M2, test = "F")
+```
+
+```{r}
+M3 = update(M2, .~.-hdl)
+drop1(M3, test = "F")
+```
+
+```{r}
+M4 = update(M3, .~.-glu)
+drop1(M4, test = "F")
+```
+
+```{r}
+M5 = update(M4, .~.-tch)
+drop1(M5, test = "F")
+```
+
+5. **Are you satisfied with the model you have arrived at? Check the assumptions.**
+
+```{r}
+library(ggfortify)
+autoplot(M5, which = 1:2) + theme_bw()
+```
+
+There does seem to be some fanning out of the residuals in the residual vs fitted value plot, indicating that there may be some heteroskedasticity in the our data.
+
+In the normal Q-Q plot, the points are all reasonably close to the diagonal line, therefore we are confident that the normal assumption is at least approximately satisfied.
+
+6. **Write down your final fitted model and interpret the estimated coefficients.**
+
+```{r}
+M5
+```
+
+$$\hat{y} = -313.8 - 21.6sex + 5.7bmi + 1.1map - 1.0tc + 0.8ldl + 73.3ltg$$
+- On average, holding the other variables constant, a 1 increase in BMI leads to a 5.7 unit increase in diabetes disease progression.
+
+- On average, holding the other variables constant, a 1 mmHg increase in mean arterial blood pressure leads to a 1.1 unit increase in diabetes disease progression.
+
+- On average, holding the other variables constant, a 1 mg/dL increase in total cholesterol leads to a 1.0 unit decrease in diabetes disease progression.
+
+- On average, holding the other variables constant, a 1 mg/dL increase in low density lipoprotein leads to a 0.8 unit increase in diabetes disease progression.
+
+- On average, holding the other variables constant, a 1 mg/dL increase in ltg leads to a 73.3 unit increase in diabetes disease progression.
+
+- On average, the holding the other variables constant, the difference in diabetes disease progression between males and females in 21.6. If male = 1 and female = 2 then we can say that the disease progression is 26.1 units less for females than males.
+
+*Note that it doesn’t make sense to interpret the intercept in this model, as values of zero in many of the covariates are not possible.*
+
+
+7. **Use the caret package to perform 5 fold cross validation to get an idea of out of sample accuracy for the final model.**
+
+```{r}
+library(caret)
+set.seed(2023)
+caret::train(formula(M5), 
+             data = diabetes,
+             method = "lm",
+             trControl = trainControl(method = "cv", number = 5))
+```
+
+
+

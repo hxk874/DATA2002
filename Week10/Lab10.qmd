@@ -1,0 +1,680 @@
+---
+title: "Lab wk10"
+format: html
+---
+
+# Lecture recap
+
+## Two-way ANOVA with Blocks
+```{r, out.width="100%"}
+knitr::include_graphics("images/tut1.png")
+```
+# Exercises
+
+```{r}
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+```
+
+
+## Poison and antidotes
+
+```{r}
+poison_data = read_csv("https://raw.githubusercontent.com/DATA2002/data/master/box_cox_survival.csv")
+poison_data = poison_data |> 
+  mutate(inv_survival = 1/y) # create the reciprocal survival time variable
+glimpse(poison_data)
+```
+Poison: I, II, III
+Antidote: A, B, C, D
+
+## Manufacturing
+
+1. Generate summary statistics for each of the treatment combination (including mean, median, standard deviation, interquartile range, sample size). 
+Make sure you don’t report too many decimal places in your summary statistics.
+
+```{r}
+poison_sum = poison_data %>% 
+  dplyr::group_by(poison, antidote) %>% # group data by the combination of poison and antidotes
+  dplyr::summarise(
+    mean = mean(inv_survival), # calculate the mean of the response
+    median = median(inv_survival), # calculate the median of the response
+    sd = sd(inv_survival), # calculate the sd of the response
+    iqr = IQR(inv_survival), # calculate the IQR of the response
+    n = n() # calculate the sample size
+  )
+
+poison_sum %>% knitr::kable(digits = 2)
+```
+
+
+2. How many replicates are there in each treatment combination?
+
+There are 4 observations in each treatment combination.
+
+
+3. Visualise the data using boxplots. Which poison tended to have the lowest survival time (highest reciprocal survival time)?
+
+`inv_survival` : outcome variable 
+
+```{r}
+# Create boxplots for each poison and antidote combination
+ggplot(poison_data, aes(x = poison, y = inv_survival, fill = antidote)) +
+  geom_boxplot() +
+  facet_wrap(~ antidote, ncol = 4) + # the antidote data has 4 levels each of which has three poison levels (groups) 
+  labs(title = "Boxplot of Reciprocal Survival Times by Poison and Antidote",
+       x = "Poison",
+       y = "Reciprocal Survival Time") +
+  theme_minimal() 
+
+```
+onother way:
+```{r}
+poison_data |>
+  ggplot() + 
+  aes(y=inv_survival, x=poison, colour = antidote) + 
+  geom_boxplot() +
+  theme_grey() +
+  facet_wrap(~antidote, ncol=4) +
+  labs(y="1/Survival", x= "Poison", colour="Antidote")
+```
+
+4. Write an appropriate model formula for a two-way ANOVA with interactions.
+
+$$Y_{ijk} = \mu + \alpha_i + \gamma_j + (\alpha \gamma)_{ij} + \epsilon_{ijk}$$
+since they are differences, they always sum to 1. 
+
+
+
+\begin{itemize}
+\item $\mu$: overall mean
+\item $\alpha_i$ and $\gamma_j$: treatment effects (differences between treatment group means and the overall mean)
+\item $(\alpha\gamma)_{ij}$: interactions effects
+\item $\epsilon_{ijk} \sim N(0, \sigma^2)$
+\end{itemize}
+
+with the following constraints:
+\begin{itemize}
+\item $\sum_i \alpha_i = 0$
+\item $\sum_j \gamma_j = 0$
+\item For each $j$, $\sum_i (\alpha\gamma)_{ij} = 0$
+\item For each $i$, $\sum_j (\alpha\gamma)_{ij} = 0$
+\end{itemize}
+
+
+
+5. Use R to fit the ANOVA model described above and generate an ANOVA table.
+
+```{r}
+a1 <- aov(inv_survival ~ poison * antidote, data = poison_data)
+summary(a1)
+
+a2 <- aov(inv_survival ~ poison + antidote, data = poison_data)
+summary(a2)
+```
+
+
+two-way can have a + or * sign inside formula.
+- * : no interaction effect
+
+Result:
+- interaction effect not significant 
+- + : lower significance
+
+be aware: we are testing on our transformed data -> thus there is a significant diff on the transformed data, 
+- YOU CANNOT CONCLUDE ON ORG DATA   
+
+6. Can the interaction effect be dropped from the model? Why or why not?
+
+if you dont se an interaction effect, you dont need to include it.
+
+### Workflow
+
+**Hypothesis**:
+$$H_0 : (\alpha \gamma)_{ij} = 0 \text{ for all } i= 1,2,3,4 \text{ and } j=1,2,3$$
+vs.
+$$H_1 : \text{ Not all } \alpha_j = 0$$
+
+**Assumptions**:
+- Normalty (for residuals)
+- Homoskedasticity: a constant variance assumption
+
+**Test Statistic**:
+$$T= \frac{\text{Mean Sq Interaction}}{\text{Mean Sq Residual}} \sim F_{(a-1)(b-1), ab(n-1)} \text{ under } H_0$$
+
+**Observed Test Statistic**:
+$$t_0 = \frac{0.262}{0.240} = 1.09 \sim F_{6,36} \text{ under } H_0$$
+
+**P-value**:
+$$P(F_{6,36} \geq t_0) = P(F_{6,36} \geq 1.09) = 0.3867$$
+
+**Conclusion**:
+Since the p-value is greater than 0.05, we don’t reject $H_0$, indicating that the interaction effects are all 0.
+
+7. Test for a poison treatment effect.
+
+Having found that the interaction term is not significant, we can proceed to consider whether or not there are any differences between the means of the main effects. I.e. we can look at the p-values associated with poison and antidote. [Note: we could also refit the model without the interaction term (drop the interaction term from the model), however, if when we were designing the experiment, we hypothesised that there should be an interaction, it’s safer to leave it in and conduct inferences using the full model. By “safer”, I mean the model won’t suffer from potential model misspecification.]
+
+Let $\alpha_1$, $\alpha_2$ and $\alpha_3$ be the treatment effects for the three levels of the poison variable (poisons I, II and III, respectively).
+
+### Workflow
+
+**Hypothesis**:
+$$H_0 : \alpha_1 = \alpha_2 = \alpha_3$$
+vs.
+$$H_1 : \text{ Not all } (\alpha \gamma)_{ij} = 0$$
+
+**Assumptions**:
+- Normalty (for residuals)
+- Homoskedasticity: a constant variance assumption
+
+**Test Statistic**:
+$$T= \frac{\text{Mean Sq Poison}}{\text{Mean Sq Residual}} \sim F_{(a-1), ab(n-1)} \text{ under } H_0$$
+
+**Observed Test Statistic**:
+$$t_0 = \frac{17.439}{0.240} = 72.64 \sim F_{2,36} \text{ under } H_0$$
+
+**P-value**:
+$$P(F_{6,36} \geq t_0) = P(F_{6,36} \geq 72.64) < 0.001$$
+
+**Conclusion**:
+Since the p-value is less than 0.05, we reject $H_0$. There is strong evidence that the treatment effects are not all the same. I.e. there is a significant difference in the (reciprocal) survival time between the three poisons.
+
+8. Generate an interaction plot and comment on what you see. 
+Do your observations agree with the results from the ANOVA table? 
+Hint: use ggplot to plot the treatment combination means directly or you can the emmip() function from the emmeans package (Lenth, 2018).
+
+```{r}
+library(emmeans)
+emmip(a1, antidote ~ poison) +
+  theme_grey()
+```
+
+
+```{r}
+library(ggfortify)
+autoplot(a1, which = 1:2, theme_gray())
+```
+```{r}
+# Use emmeans package for interaction plot
+library(emmeans)
+emmip(a1, poison ~ antidote, CIs = TRUE)
+```
+
+Since there are no intersections between lines this suggests that there’s no interaction effect, as found above using the formal test.
+
+👉 You can see antidote A has the largest effect on the response at all levels of poison, and this holds for all other three levels of antidote. This means that the effect of one factor is the same at all levels of the other factor, and therefore, there’s no interaction effect.
+
+
+9. What are the assumptions required for the ANOVA test to be valid? Generate appropriate diagnostic plots. Comment as to whether or not the assumptions are satisfied with reference to the diagnostic plots?
+
+The ANOVA test assumes the residuals to follow a **normal distribution** with **constant variance**. We can check this using a scatter plot of the residuals against the fitted values (looking for **homoskedasticity**: constant error variance over the range of fitted values) and a normal quantile plot (looking to see that the points are close to the diagonal line).
+
+```{r}
+# using autoplot() from the ggfortify package
+library(ggfortify)
+autoplot(a1, which = 1:2) + 
+  theme_bw()
+```
+
+
+
+```{r}
+# manually extracting the fitted values and residuals
+poison_data = poison_data %>% 
+  mutate(
+    fitted = a1$fitted.values, # extract fitted values from the anova object
+    resid = a1$residuals # extract residuals from the anova object
+  )
+
+d1 = poison_data %>% 
+  ggplot() +
+  aes(x = fitted, y = resid) + # visualise fitted values against residuals
+  geom_point() + 
+  geom_hline(yintercept = 0, colour = "gray", lty = 2) + # draw a horizontal dotted line that represents 0 residual
+  theme_bw() + 
+  labs(title = "Residuals vs fitted", x = "Fitted values", y = "Residuals")
+
+d2 = poison_data %>% 
+  ggplot() +
+  aes(sample = resid) + # visualise residuals
+  geom_qq() + # draw dot points
+  geom_qq_line() + # draw the straight line
+  theme_bw() +
+  labs(title = "Normal QQ of the residuals", x = "Theoretical quantiles", y = "Residuals")
+
+gridExtra::grid.arrange(d1, d2, ncol = 2)
+```
+
+**Residual plot**: It shows that the spread of residuals is roughly even above and below the central line and across the range of fitted values. Hence the equality of variance assumption is approximately satisfied.
+
+**QQ Plot**: The points are all reasonably close to the diagonal line. Hence the normality assumption for residuals is approximately satisfied.
+
+
+
+## Manufacturing
+
+The data below gives the number of units produced in a day by 4 different machines:
+  A, B, C and D, 
+on each of 5 different days. The days may be regarded as a nuisance factor. We wish to compare the production levels of the machines and consider the days as blocks.
+
+```{r}
+library(tidyverse)
+manufacturing = read_csv("https://raw.githubusercontent.com/DATA2002/data/master/manufacturing.csv")
+knitr::kable(manufacturing)
+```
+
+1. Convert the data from its current “wide” format to “long” format.
+
+```{r}
+# using `gather`: wide to long
+manuf = gather(manufacturing, key = "machine", value = "output", A:D) %>% # create a new column called "machine" using the existing old columns A ~ D
+    mutate(day = factor(Day, levels = c("Mon", "Tue", "Wed", "Thu", "Fri")))
+glimpse(manuf)
+
+# Convert to long format
+manufacturing_long <- manufacturing %>%
+  pivot_longer(
+    cols = A:D,  # Columns to pivot into longer format
+    names_to = "Machine",  # Name of new column for machine identifiers
+    values_to = "Units"  # Name of new column for values
+  )
+```
+
+2. Summarise and visualise the data. What do you notice?
+
+```{r}
+summary_stats <- manufacturing_long %>%
+  group_by(Machine, Day) %>%
+  summarise(
+    mean = mean(Units, na.rm = TRUE),
+    median = median(Units, na.rm = TRUE),
+    sd = sd(Units, na.rm = TRUE),
+    iqr = IQR(Units, na.rm = TRUE),
+    count = n(),
+    .groups = 'drop'
+  )
+
+summary_stats
+```
+
+
+```{r}
+# Visualize the data
+manuf %>%
+  ggplot() + 
+  aes(x = machine, y = output, colour = day) +
+  geom_point() +
+  theme_bw()
+```
+
+```{r}
+manuf %>%
+  ggplot() +
+  aes(x = day, y = output, colour = machine) +
+  geom_point() +
+  theme_bw()
+```
+
+we care about the effect of each machine and them compared to eachother. 
+add day as a block
+
+```{r}
+manuf %>%
+  group_by(day) %>% # group data by day and for each day (group),
+  dplyr::summarise(mean = mean(output), # calculate the mean output level
+                   median = median(output), # calculate the median output level
+                   sd = sd(output), # calculate the sd of output level
+                   n = n()) %>% # calculate the number of observations
+    knitr::kable(digits = 2)
+```
+Monday and Friday seem to be lower output days.
+
+```{r}
+# similarly for each machine level (group)
+manuf %>%
+  group_by(machine) %>%
+  dplyr::summarise(mean = mean(output),
+                   median = median(output),
+                   sd = sd(output), 
+                   n = n()) %>%
+  knitr::kable(digits = 2)
+```
+Machine A seems to be outputting less than the other three machines.
+
+
+3. How many observations do we have in each treatment group?
+
+The common sample (block) size is $n=5$ (5 days per machine).
+
+
+4. Write an appropriate model formula for a two-way ANOVA with blocks.
+
+$$Y_{ij} = \mu + \alpha_i + \beta_j + e_{ij}$$
+
+\begin{itemize}
+    \item $\mu$: overall mean
+    \item $\alpha_i$: the treatment effect for machine $i = 1, 2, 3, 4$
+    \item $\beta_j$: the block effect for day $j = 1, 2, 3, 4, 5$
+    \item $e_{ij} \sim N(0, \sigma^2)$
+\end{itemize}
+
+with the following constraints:
+\begin{itemize}
+\item $\sum_i \alpha_i = 0$
+\item $\sum_j \beta_j = 0$
+\end{itemize}
+
+
+5. Test if there is a machine effect.
+
+```{r}
+aov(output ~ Day + machine, data = manuf)|> summary()
+aov(output ~ machine, data=manuf) |> summary()
+```
+
+4772 to 2626: adding the blocking vaariabe, reduces the R
+  -> gives a bigger F value -> more significant (lower) p-value
+  
+```{r}
+manuf_aov = aov(output ~ day + machine, data = manuf)
+summary(manuf_aov)
+```
+
+Let $\alpha_1, \alpha_2, \alpha_3$ and $\alpha_4$ be the treatment effects for the 4 machines A, B, C and D, respectively.
+
+### Workflow
+
+**Hypothesis**:
+$$H_0 : \alpha_1 = \alpha_2 = \alpha_3 = \alpha_4 = 0$$
+vs.
+$$H_1 : \text{ Not all } \alpha_j = 0$$
+
+**Assumptions**:
+- Normalty (for residuals)
+- Homoskedasticity: a constant variance assumption
+
+**Test Statistic**:
+$$T= \frac{\text{Mean Sq Machine}}{\text{Mean Sq Residual}} \sim F_{(a-1),(a-1)(b-1)} \text{ under } H_0$$
+
+**Observed Test Statistic**:
+$$t_0 = \frac{4482}{219} = 20.478 \sim F_{3,12} \text{ under } H_0$$
+
+**P-value**:
+$$P(F_{3,12} \geq t_0) = P(F_{3,12} \geq 20.478) < 0.001$$
+
+**Conclusion**:
+ Since the p-value is less than 0.05, we reject $H_0$. There is strong evidence that the treatment effects are not all the same. I.e. there is a significant difference between the mean outputs of the four difference machines.
+
+**What if we don’t include the block (day)?**
+```{r}
+# without the block variable
+one_aov = aov(output ~ machine, data = manuf)
+summary(one_aov)
+```
+
+Without blocking, both RSS and RMS increase (4772 and 298, respectively), and therefore, we can see blocking reduces RSS and RMS. As a result, the $F$-statistic increases from 15.03 to 20.478 by including the block.
+
+6. Check and comment on the ANOVA assumptions.
+```{r}
+autoplot(manuf_aov, which = 1:2) + theme_grey()
+```
+
+normal dist, constant res
+
+There is no apparent pattern in the residual vs fitted values plot, hence the common variance assumption is OK. Similarly, the points in the normal QQ plot are all reasonably close to the diagonal line, which suggests that the normality assumption is at least approximately satisfied.
+
+7. Perform post hoc tests to see which pairs of machines have significantly different means.
+
+post hoc test changes a bit, but we dont worry about that
+
+```{r}
+em_machine = emmeans(manuf_aov, ~machine)
+contrast(em_machine, method = "pairwise", adjust = "tukey")
+```
+
+```{r}
+contrast(em_machine, method = "pairwise", adjust = "tukey") %>%
+  plot() +
+  geom_vline(xintercept = 0, color = "red") +
+  theme_bw()
+```
+
+We see that machine A is significantly different to the other machines (which in turn are not significantly different to each other).
+
+**Comment**: this is a block design, so we’re not really interested in considering if day is significant - looking at the p-value for day, it isn’t significant, but it has still played an important role in reducing the residual mean square and hence improved the sensitivity of the tests for differences among machines.
+
+
+
+## Hubble
+
+Hubble (1929) investigated the relationship between distance of a galaxy from the earth and the velocity with which it appears to be receding. This information can then be used to estimate the time since “Big Bang”.
+
+Hubble’s law is as follows:
+$$\text{Recession velocity} = H_0 \times \text{Distance}$$
+
+where $H_0$ is Hubble’s constant thought to be about 75 km/sec/Megaparsec.
+
+the further away, the faster it moves.
+
+The data can be imported as follows:
+```{r}
+library(tidyverse)
+hubble = read_tsv("https://raw.githubusercontent.com/DATA2002/data/master/Hubble.txt")
+glimpse(hubble)
+```
+
+1. What will be the most effective visualisation to look at this data. Add a line of best fit to your plot. Compare your results to Figure 1 from the PNAS paper (below).
+
+fix your intercept to 0
+```{r}
+hubble_scatter = hubble %>% 
+  ggplot() +
+  aes(x = distance, y = recession_velocity) +
+  geom_point() +
+  theme_bw()
+
+## Adding a regression line 
+hubble_lm = hubble_scatter +
+  geom_smooth(method = "lm", se = FALSE)
+
+## Adding a different line with intercept being zero
+hubble_lm2 = hubble_lm +
+  geom_smooth(method = 'lm',
+              formula = y ~ -1 + x,
+              col="red",
+              se = FALSE)
+
+gridExtra::grid.arrange(hubble_lm, hubble_lm2, ncol=2)
+```
+
+
+2. Does the regression make sense with the constant term = 0? (if the distance from the earth is zero, is the velocity from the earth 0?) Fit the model allowing for an intercept and test the null hypothesis that the intercept is equal to zero. Fit another regression that does not allow an intercept and write down your estimate for Hubble’s constant. You can force the regression line to have a zero intercept by putting a -1 in the model formula, e.g. `slm(y ~ x - 1)`.
+
+```{r}
+hfit1 = lm(recession_velocity ~ distance, data = hubble)
+summary(hfit1)
+```
+
+the estimate of distance is what we are interested in
+
+Next: fix the intercept
+  -> the estimate changes
+
+Let the population model be:
+$$\text{Recession velocity} = \beta_0 + \beta_1 \text{Distance} + \epsilon$$
+We want to test if $\beta_0 = 0$.
+
+**Hypothesis**:
+$$H_0: \beta_0 = 0 \quad \text{vs} \quad H_1: \beta_0 \neq 0$$
+
+**Assumptions**:
+- Normality (for residuals): $\epsilon_i$ are i.i.d $N(0, \sigma^2)$
+- Linear relationship between $y$ and $x$
+
+**Test Statistic**:
+$$T = \frac{\hat{\beta}_0}{SE(\hat{\beta}_0)} \sim t_{n-2} \quad \text{under } H_0$$
+
+**Observed Test Statistic**:
+$$t_0 = -0.489$$
+
+**P-value**:
+$$2P(t_{n-2} \geq |t_0|) = 2P(t_{n-2} \geq 0.489) = 0.63$$
+
+**Conclusion**:
+Since the p-value is greater than 0.05, we don't reject $H_0$, indicating that the intercept is not significantly different from zero. We can fit the model forcing the intercept to be exactly zero (i.e. don't allow for an intercept in the model). We're only doing this because it is dictated by the underlying physics that the model is trying to describe - in general, you wouldn't be checking for the significance of the intercept, you'd just leave it in the model regardless.
+
+```{r}
+hfit2 = lm(recession_velocity ~ -1 + distance, data = hubble)
+summary(hfit2)
+```
+
+We can compare the two models nicely using the stargazer package or the sjPlot package.
+
+Using the `stargazer` package:
+```{r}
+library(stargazer)
+stargazer(hfit1, hfit2, type = "text")
+```
+
+Using the `sjPlot` package:
+```{r}
+library(sjPlot)
+tab_model(hfit1, hfit2, show.ci = FALSE)
+```
+
+Note that it looks like the $R^2$ is higher for the model without an intercept, but the reported $R^2$ value is calculated differently for models where an intercept is not allowed, and it cannot be compared to models which do allow an intercept. See https://stats.stackexchange.com/questions/26176/removal-of-statistically-significant-intercept-term-increases-r2-in-linear-mo  for some discussion around this. In general forcing your estimated regression model to pass through the origin is not a good idea.
+
+3. Generate plots to check for equal variance and the normality of the residuals.
+```{r}
+autoplot(hfit1, which = 1:2) + theme_grey()
+```
+
+does not ask to check for linearity, but this is the most important one.
+
+In the residual vs fitted values plot, there is no obvious pattern in the spread of the residuals across the range of fitted values. It looks like the homoskedasticity assumption is satisfied as the points are roughly equally spread over the range of fitted values.
+
+In the normal QQ plot, the points are all quite close to the diagonal line, suggesting that the normality assumption is comfortably satisfied.
+
+result: constant variance, normal dist
+
+4. Hubble started off being way off (around 500), and successive experiments over the years brought the estimate down as they got better at measuring things. https://en.wikipedia.org/wiki/Hubble%27s_law
+
+
+# Quiz
+
+```{r}
+data("airquality")
+dplyr::glimpse(airquality)
+```
+
+```{r}
+# Remove rows with missing values
+airquality_complete <- na.omit(airquality)
+
+# Fit the linear regression model
+model <- lm(Ozone ~ Solar.R, data=airquality_complete)
+
+# Summary of the model to get estimates
+summary_info <- summary(model)
+```
+
+```{r}
+slope_estimate <- summary_info$coefficients['Solar.R', 'Estimate']
+slope_se <- summary_info$coefficients['Solar.R', 'Std. Error']
+
+# Calculate the t-statistic
+(slope_estimate - 0.1) / slope_se
+```
+
+```{r}
+# Load the airquality dataset
+data("airquality")
+
+# Fit a linear regression model
+model <- lm(Ozone ~ Wind, data=airquality)
+
+# Get the summary of the model
+model_summary <- summary(model)
+
+# Extract the estimated slope and its standard error
+slope_estimate <- model_summary$coefficients["Wind", "Estimate"]
+slope_se <- model_summary$coefficients["Wind", "Std. Error"]
+
+# Hypothesized slope value
+hypothesized_value <- -5
+
+# Calculate the test statistic
+test_statistic <- (slope_estimate - hypothesized_value) / slope_se
+
+# Print the test statistic
+print(test_statistic)
+
+```
+
+
+
+
+```{r}
+data("mtcars")
+dplyr::glimpse(mtcars)
+```
+```{r}
+# Fit the linear regression model
+model <- lm(mpg ~ disp, data=mtcars)
+summary(model)
+```
+
+```{r}
+# Conducting a hypothesis test for the slope
+# H0: beta (slope) = -0.05
+# HA: beta (slope) != -0.05
+test_result <- coef(summary(model))["disp", ]
+slope_estimate <- test_result["Estimate"]
+std_error <- test_result["Std. Error"]
+t_value <- (slope_estimate + 0.05) / std_error
+
+# Output the test statistic
+t_value
+```
+
+
+```{r}
+# Load the mtcars dataset
+data("mtcars")
+
+# Fit the null model (intercept only)
+null_model <- lm(mpg ~ 1, data = mtcars)
+
+# Fit the full model (all variables)
+full_model <- lm(mpg ~ ., data = mtcars)
+
+step.fwd.aic = step(null_model, 
+                    scope = list(lower = null_model, upper = full_model),
+                    direction = "forward", 
+                    trace = FALSE)
+summary(step.fwd.aic)
+
+```
+
+```{r}
+# Load necessary library
+library(dplyr)
+
+# Load the dataset
+data("mtcars")
+mtcars$cyl <- as.factor(mtcars$cyl)  # Convert cyl to factor
+
+# Fit the full model
+full_model <- lm(mpg ~ ., data=mtcars)
+
+# Perform backward stepwise selection
+reduced_model <- step(full_model, direction="backward")
+
+# Display the final model
+summary(reduced_model)
+```
+
+
+

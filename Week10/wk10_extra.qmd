@@ -1,0 +1,154 @@
+---
+title: "Credit data"
+subtitle: "Exhaustive Searches and stepwise methods"
+format: html
+---
+
+
+```{r, warning=FALSE, message=FALSE}
+library(ISLR)
+library(sjPlot)
+library(leaps)
+library(lmSubsets)
+```
+
+## Exhaustive searches
+
+Goal: predict the average credit card balance given the explanatory variables
+
+```{r}
+# ?ISLR::Credit
+str(Credit)
+```
+
+### Using the `regsubsets()` function
+
+
+```{r regsubsets-forward}
+exhaustive.credit <- leaps::regsubsets(
+  Balance ~ . - ID,
+  data = Credit,
+  method = "exhaustive", 
+  nvmax = 11)
+summary.exhaustive.credit <- summary(exhaustive.credit)
+summary.exhaustive.credit
+str(summary.exhaustive.credit)
+```
+
+#### AIC
+
+For linear models, [Mallows Cp](https://en.wikipedia.org/wiki/Mallows%27s_Cp) will give the same result as the AIC.
+
+```{r regsubsets-forward-Cp}
+min.cp <- which.min(summary.exhaustive.credit$cp)
+plot(summary.exhaustive.credit$cp, type = 'l',
+     ylab = "Mallows C_p measure", 
+     xlab = "Number of features")
+points(summary.exhaustive.credit$cp)
+points(min.cp, summary.exhaustive.credit$cp[min.cp], pch = 4, col = "blue", cex = 2)
+```
+
+
+#### BIC
+
+The [BIC](https://en.wikipedia.org/wiki/Bayesian_information_criterion) is an alternative information criterion that tends to penalise more heavily than the AIC for extra predictors.
+
+```{r regsubsets-forward-BIC}
+min.bic <- which.min(summary.exhaustive.credit$bic)
+plot(summary.exhaustive.credit$bic, type = 'l',
+     ylab = "BIC", 
+     xlab = "Number of features")
+points(summary.exhaustive.credit$bic)
+points(min.bic, summary.exhaustive.credit$bic[min.bic], pch = 4, col = "blue", cex = 2)
+```
+
+#### Adjusted R2
+
+```{r regsubsets-forward-}
+max.adjr2 <- which.max(summary.exhaustive.credit$adjr2)
+plot(summary.exhaustive.credit$adjr2, type = 'l',
+     ylab = "Adjusted R2", 
+     xlab = "Number of features")
+points(summary.exhaustive.credit$adjr2)
+points(max.adjr2, summary.exhaustive.credit$rsq[max.adjr2], pch = 4, col = "blue", cex = 2)
+```
+
+### Using the `lmSubsets()` function
+
+```{r}
+exhaustive.out = lmSubsets::lmSubsets(
+  Balance ~ . - ID,
+  data = Credit, nbest = 1,
+  nmax = NULL,
+  method = "exhaustive")
+plot(exhaustive.out, penalty = "BIC")
+plot(exhaustive.out, penalty = "AIC")
+```
+
+```{r}
+exhst.cp = lmSubsets::lmSelect(exhaustive.out, penalty = "AIC")
+exhst.bic = lmSubsets::lmSelect(exhaustive.out, penalty = "BIC")
+```
+
+Compare the exhaustive Cp with exhaustive BIC:
+
+```{r}
+sjPlot::tab_model(
+  refit(exhst.cp), refit(exhst.bic),
+  show.ci = FALSE, show.p = FALSE,
+  dv.labels = c("Exhaustive Cp", "Exhaustive BIC"))
+```
+
+
+
+## Stepwise
+
+### Backwards stepwise
+
+The [BIC](https://en.wikipedia.org/wiki/Bayesian_information_criterion) is an alternative information criterion that tends to penalise more heavily than the AIC for extra predictors. For the AIC the penalty is $2p$ whereas for the BIC the penalty is $\log(n)p$.
+
+```{r}
+M1 = lm(Balance ~ . - ID, data = Credit)
+back_aic = step(M1, direction = "backward", trace = 0)
+back_bic = step(M1, direction = "backward", k = log(nrow(Credit)), trace = 0)
+summary(back_aic)
+summary(back_bic)
+```
+
+### Forward stepwise
+
+```{r}
+M0 = lm(Balance ~ 1, data = Credit)
+fwd_aic = step(M0, scope = list(lower=M0, upper=M1), 
+              direction = "forward", trace = 0)
+fwd_bic = step(M0, scope = list(lower=M0, upper=M1), 
+               direction = "forward", k = log(nrow(Credit)), 
+               trace = 0)
+summary(fwd_aic)
+summary(fwd_bic)
+```
+
+### Forward and backward stepwise
+
+```{r}
+both_aic = step(M1, direction = "both", trace = 0)
+both_bic = step(M1, direction = "both", k = log(nrow(Credit)), trace = 0)
+summary(both_aic)
+summary(both_bic)
+```
+
+### Summary
+
+```{r}
+sjPlot::tab_model(
+  back_aic, fwd_aic, both_aic,
+  back_bic, fwd_bic, both_bic, 
+  show.ci = FALSE, show.p = FALSE,
+  dv.labels = c("Backward AIC", "Forward AIC", "Both AIC",
+                "Backward BIC", "Forward BIC", "Both BIC"))
+```
+
+## Next steps...
+
+Having identified some candidate models, you might go ahead and check their out of sample performance...
+

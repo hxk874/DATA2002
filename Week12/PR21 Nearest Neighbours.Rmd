@@ -1,0 +1,145 @@
+---
+title: "PR21: Nearest neighbours"
+output: html_document
+date: "2024-10-21"
+---
+
+# Nearest neighbours
+
+## Microchip test data
+```{r}
+library(tidyverse)
+data = read_csv("https://raw.githubusercontent.com/DATA2002/data/master/Microchips.csv")
+glimpse(data)
+```
+
+
+```{r}
+ggplot(data) +
+  aes(x=Test1, y=Test2, 
+      color=factor(Label)) + 
+  geom_point(size=5, alpha = 0.8)
+```
+
+## kNN
+
+### kNN in R
+
+Split our data into predictors (X), and response (y),
+```{r}
+library(class)
+X = data |> 
+  dplyr::select(Test1, Test2)
+y = as.factor(data$Label)
+```
+
+
+Use knn to predict a grid of new data points:
+
+```{r}
+new.X = expand.grid(
+  Test1 = seq(min(X$Test1 - 0.5),
+              max(X$Test1 + 0.5), 
+              by = 0.1),
+  Test2 = seq(min(X$Test2 - 0.5), 
+              max(X$Test2 + 0.5),
+              by = 0.1)
+  )
+```
+
+```{r}
+p = ggplot(new.X) +
+  geom_point(aes(x=Test1, y=Test2), 
+             alpha=0.1)
+p
+```
+
+Now we call the knn function, putting in our original observations and their observed the classes as well as the grid of “new points” that we’ll be predicting.
+We also need to specify how many neighbours we want to learn from.
+For now let $k=3$.
+
+```{r}
+pred_k3 = knn(train = X, test = new.X, 
+              cl = y, k = 3, prob = TRUE)
+pred_prob_k3 = attr(pred_k3, "prob")
+```
+
+We can also see how our decisions change based on the number of neighbours we consider.
+Here, we consider k=9.
+
+```{r}
+pred_k9 = knn(train = X, test = new.X, 
+              cl = y, k = 9, prob = TRUE)
+pred_prob_k9 = attr(pred_k9, "prob")
+```
+
+## Performance assessment
+
+Let’s compare k=3 and k=9
+In sample confusion matrix
+
+```{r}
+library(caret)
+
+# k=3
+k3 = knn(train = X, test = X, cl = y, k = 3)
+confusionMatrix(k3, y)$table
+confusionMatrix(k3, y)$overall[1] |> round(2)
+
+#k=9
+k9 = knn(train = X, test = X, cl = y, k = 9)
+confusionMatrix(k9, y)$table
+confusionMatrix(k9, y)$overall[1] |> round(2)
+```
+
+
+```{r}
+res = data.frame(
+  k = 1:20,
+  accuracy = NA
+)
+for(k in res$k){
+  k_temp = knn(train = X, test = X, 
+               cl = y, k = k)
+  cmat = confusionMatrix(k_temp, y)
+  res$accuracy[k] = cmat$overall[1]
+}
+```
+
+
+```{r}
+ggplot(res) + 
+  aes(x = k, y = accuracy) +
+  geom_point() + geom_line() 
+```
+
+
+```{r}
+
+```
+
+
+
+```{r}
+
+```
+
+
+```{r}
+
+```
+
+
+```{r}
+
+```
+
+
+
+```{r}
+
+```
+
+
+
+

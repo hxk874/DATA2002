@@ -1,0 +1,305 @@
+---
+title: "Live Lecture wk 11"
+subtitle: "Decision trees and random forests"
+format: html
+---
+
+# Decision trees
+
+## Weaknesses
+
+• Decision trees can become very complex very quickly - without a complexity penalty, it will happily continue until perfect classification (likely massively overfitting the data).
+
+• The selected tree might be very sensitive to the complexity penalty
+
+• Can only make decisions parallel to axes:
+
+# Iris dataset
+
+```{r}
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+glimpse(iris)
+```
+
+```{r}
+table(iris$Species)
+```
+
+
+
+```{r}
+library(GGally)
+ggpairs(iris, mapping = aes(col = Species)) + theme_classic()
+```
+
+### Iris tree
+
+### Visualising the tree
+```{r}
+library(rpart)
+tree = rpart(Species ~ ., data = iris, method = "class")
+tree
+```
+
+
+```{r}
+library(rpart)
+tree = rpart(
+  Species ~ .,
+  data = iris,
+  method = "class") 
+
+library(rpart.plot)
+rpart.plot(tree, extra = 104)
+```
+**How would we predict the species of a flower with:**
+
+  Sepal.Length = 5.0
+  Sepal.Width = 3.9
+  Petal.Length = 1.4
+  Petal.Width = 0.3
+  
+Red box: setosa
+
+  Sepal.Length = 5.0
+  Sepal.Width = 3.9
+  Petal.Length = 3.4
+  Petal.Width = 0.3
+
+Dark grey box: versicolor
+
+
+### How does it work?
+In this tree, we only need to consider two variables
+
+```{r}
+p1 = iris |> ggplot() +
+  aes(x = Petal.Length, 
+      y = Petal.Width, 
+      colour = Species) + 
+  geom_point(size = 2)
+p1
+```
+
+The first branch is done to “best” split the data to create the most “pure” (homogenous) partitions.
+```{r}
+p2 = p1 + 
+  geom_vline(
+    aes(xintercept=2.45),
+    linewidth = 1
+  )
+p2
+# you could also have done a horiznozal line to seperate 
+# around petal.Width 0.75
+```
+
+The next branch applies to observations that have Petal.Length > 2.45 and it tries to find the next best split of the data.
+Petal.width < 1.75
+```{r}
+p3 = p2 + 
+  geom_segment(
+    aes(x = 2.45, y = 1.75, 
+        xend = 6.9, yend = 1.75),
+    linewidth = 1,
+    colour = "black"
+  )
+p3
+```
+
+### Alternative visualisation with partykit
+```{r}
+#install.packages("partykit") # A Toolkit for Recursive Partytioning
+library(partykit)
+plot(as.party(tree))
+```
+
+### Making a prediction
+```{r}
+tree <- rpart(Species ~ ., data = iris, method = "class")
+```
+
+
+```{r}
+new_data = data.frame(Sepal.Length = c(5.0, 5.0), 
+                      Sepal.Width = c(3.9, 3.9),
+                      Petal.Length = c(1.4, 3.4), 
+                      Petal.Width = c(0.3,0.3),
+                      Species = c(NA,NA))
+new_data
+```
+
+### Does it seem reasonable?
+```{r}
+# "class" : classification
+predict(tree, new_data, type = "class")
+```
+
+
+```{r}
+library(ggplot2)
+# plotting the previous predictions
+p1 + geom_point(data = new_data, size = 2, colour = "black")
+```
+
+Assessing in sample performance in the iris data
+```{r}
+library(caret) # confusion matrix function
+
+predicted_species = predict(tree, type = "class")
+confusionMatrix(data = predicted_species, reference = iris$Species)
+```
+
+
+
+# Titanic
+
+```{r}
+library(rpart)
+data("Titanicp", package = "vcdExtra")
+titanic_tree = rpart(survived ~ sex + age + pclass, data = Titanicp, method = "class")
+titanic_tree
+```
+
+```{r}
+plot(as.party(titanic_tree))
+```
+### complexity parameter
+
+What if we in lower the complexity parameter threshold, so that each new branch only needs to decrease the error by **0.9%**?
+```{r}
+titanic_tree_0.9 = rpart(survived ~ sex + age + pclass, data = Titanicp, method = "class", 
+                      control = rpart.control(cp = 0.009))
+plot(as.party(titanic_tree_0.9))
+```
+
+
+What if we in increase the complexity parameter threshold, so that each new branch needs to decrease the error by 2%?
+```{r}
+titanic_tree_2 = rpart(survived ~ sex + age + pclass, data = Titanicp, method = "class", 
+                      control = rpart.control(cp = 0.02))
+plot(as.party(titanic_tree_2))
+```
+
+## Evaluating (in-sample) performance
+```{r}
+# 1% (default)
+titanic_1_pred = predict(titanic_tree, type = "class")
+confusionMatrix(data=titanic_1_pred, reference = Titanicp$survived)$table # pull out the confusion table itself 
+
+confusionMatrix(data=titanic_1_pred, reference = Titanicp$survived)$overall[1]
+```
+
+
+```{r}
+# 0.9%
+titanic_0.9_pred = predict(titanic_tree_0.9, type = "class")
+confusionMatrix(data=titanic_0.9_pred, 
+                reference = Titanicp$survived)$table
+
+confusionMatrix(data=titanic_0.9_pred,
+                reference = Titanicp$survived)$overall[1]
+```
+
+
+```{r}
+# 2%
+titanic_2_pred = predict(titanic_tree_2, type = "class")
+confusionMatrix(data=titanic_2_pred, 
+                reference = Titanicp$survived)$table
+
+confusionMatrix(data=titanic_2_pred,
+                reference = Titanicp$survived)$overall[1]
+```
+overall accuracy still pretty good. 
+
+## Performance benchmarking
+```{r}
+table(Titanicp$survived)
+```
+
+What if our prediction model was just that everyone died? 
+The accuracy would be:
+```{r}
+809/(809+500)
+```
+When considering performance, we should take into account that a “null” model might appear to give quite good performance when we have unbalanced group sizes.
+
+
+## Evaluating (out-of-sample) performance
+
+**Model selection**
+ -> which you then use for your final model
+```{r}
+titanic_complete = Titanicp |> 
+  select(survived, sex, age, pclass) |> 
+  drop_na()
+
+train(survived ~ sex + age + pclass, 
+      data = titanic_complete,
+      method = "rpart", # not just the defults complexity parameter, but will try some different to find the best
+      
+      # Training control method is the same as for Regression
+      trControl = trainControl(method = "cv", 
+                               number = 10)) # 10-fold 
+```
+Results:
+best com. param = 0.0164 = 1.639 %
+
+
+## Final model
+
+The CV procedure suggested 1.6% for the complexity parameter.
+```{r}
+titanic_final = rpart(survived ~ sex + age + pclass, 
+                      data = titanic_complete, 
+                      control = rpart.control(cp = 0.016))
+plot(as.party(titanic_final))
+```
+
+# Random forests
+
+When doing classification, the randomForest::randomForest() function in R
+defaults to 500 trees each trained on sqrt(p) variables where p is the number of
+predictors in the full data set.
+
+
+
+## `randomForest` in R
+
+### Iris
+```{r}
+library(randomForest)
+iris_rf <- randomForest(Species ~ ., data = iris)
+iris_rf
+```
+Using the `randomForest()` function, we can train our ensemble learning using the same formula we passed to `rpart`.
+
+```{r}
+new_data
+```
+
+```{r}
+predict(iris_rf, new_data)
+```
+
+```{r}
+predict(tree, new_data, type = "class")
+```
+
+```{r}
+p1 + geom_point(data = new_data, size = 2, colour = "black")
+```
+
+## Titanic random forest
+
+```{r}
+titanic_rf = randomForest(survived ~ sex + age + pclass, titanic_complete)
+titanic_rf
+```
+
+```{r}
+importance(titanic_rf)
+```
+

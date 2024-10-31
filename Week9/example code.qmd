@@ -1,0 +1,284 @@
+---
+title: Week 9 live lecture code
+---
+
+## Air pollution
+
+The data frame `environmental` has four environmental variables `ozone`, `radiation`, `temperature` and `wind` taken in New York City from May to September of 1973.
+
+111 different observations of 4 different parameters
+
+```{r, message = FALSE}
+library(tidyverse)
+data("environmental", package = "lattice")
+# ?environmental
+glimpse(environmental)
+```
+
+```{r}
+p = ggplot(environmental) + aes(x = temperature, y = ozone) + 
+  geom_point(size = 3, alpha = 0.6) + 
+  labs(x = "Temperature (°F)", y = "Ozone concentration\n(parts per billion)")
+p
+```
+Does it look like there is a connection?
+- yes
+
+
+Add a linear linear model.
+```{r}
+p + geom_smooth(method = "lm", se = FALSE)
+```
+
+```{r}
+lm1 = lm(ozone ~ temperature, # numeric outcome ~ predictor
+         data = environmental)
+lm1
+```
+$$\hat{\beta}_0 = -147.646 \,\ \,\ , \,\ \,\ \hat{\beta}_1 = 2.439$$
+Our estimated model is:
+$$\hat{\text{ozone}} =-147.646 + 2.439 \times \text{temp}$$
+
+### Fitted values and residuals
+
+The fitted values ($\hat{y}$) are obtained by plugging the observed predictor ($x$) values into our estimated model, $\hat{y}_i = \hat{\beta}_0 + \hat{\beta}_1 x_i$.
+```{r}
+environmental = environmental |> 
+  mutate(
+    fitted = -147.646 + 2.439 * temperature
+  )
+```
+
+
+The residuals are the differences between the observed outcome variable ($y$) and the value the estimated model predicts for that observation (the fitted value, $\hat{y}$),
+$$r_i = y_i - \hat{y}_i$$
+
+
+Extract the residuals and fitted values from the `lm1` object directly:
+
+```{r}
+environmental = environmental |> 
+  mutate(
+    resid = lm1$residuals,
+    fitted = lm1$fitted.values
+  )
+```
+
+Alternatively we could have used the `augment()` function from the **broom** package to do this:
+- extract used variables: ozone, temperature and assigns values 
+```{r}
+broom::augment(lm1) |> glimpse()
+```
+## The lm object
+
+What other hidden treasures does the `lm1` object hold?
+
+All the values computed in the linear model: 
+```{r}
+names(lm1)
+
+# important is:
+# lm1$resid     : partial matching 
+# lm1$residuals : type completion
+
+# lm1$coef, lm1$coefficients : partial matching, type completion
+# ...
+```
+
+
+E.g. we can extract the coefficients:
+
+```{r}
+lm1$coefficients
+```
+
+Or we can use the `tidy()` function from the **broom** package:
+
+```{r}
+lm1 |> broom::tidy()
+```
+
+# Checking assumptions
+
+## Linear regression assumptions
+
+There are 4 assumptions underling our linear regression model:
+ 1. Linearity - the relationship between $Y$ and $x$is linear
+ 2. Independence - all the errors are independent of each other
+ 3. Homoskedasticity - the errors have constant variance Var$(\varepsilon_i) = \sigma^2$ for all $i=1,...n$.
+ 4. Normality - the errors follow a normal distribution
+
+The last three can be written succinctly as $\varepsilon_i \sim$ iid $N(0,\sigma^2)$.
+
+
+```{r}
+p1 = environmental |> ggplot() + 
+  aes(x = temperature, y = ozone) + 
+  geom_point(size = 2) + 
+  labs(x = "Temperature (°F)",
+       y = "Ozone concentration") +
+  geom_smooth(method="lm", se=FALSE)
+p1
+```
+
+```{r}
+p2 = environmental |> ggplot() + 
+  aes(x = temperature, y = resid) + 
+  geom_point(size = 2) + 
+  labs(x = "Temperature (°F)",
+       y = "Residual") +
+  geom_hline(yintercept = 0, color="blue")
+p2
+```
+overestimate: negative $\varepsilon_i$
+underestimate: positive $\varepsilon_i$
+
+```{r}
+p2 + geom_smooth(method = "loess", # local smothing
+                 se = FALSE, color="red")
+```
+= pattern that we would want to do somehting about. 
+
+```{r, out.width="100%"}
+knitr::include_graphics("images/slide20.png")
+```
+
+### Consider taking the log
+
+```{r, fig.height=7}
+p1 + scale_y_log10()
+```
+
+```{r}
+environmental = environmental |> 
+  mutate(lozone = log(ozone))
+lm2 = lm(lozone ~ temperature, data = environmental)
+lm2
+```
+
+```{r}
+environmental = environmental |> 
+  mutate(
+    lfitted = lm2$fitted.values,
+    lresid = lm2$residuals
+  )
+```
+
+```{r}
+p1 = environmental |> ggplot() + 
+  aes(x = temperature, y = lozone) + 
+  geom_point(size = 3) + 
+  theme_classic(base_size = 15) + 
+  labs(x="Temperature (°F)",
+       y="Log ozone concentration") +
+  geom_smooth(method="lm", se=FALSE)
+p1
+```
+
+```{r}
+p2 = environmental |> ggplot() + 
+  aes(x = temperature, y = lresid) + 
+  geom_point(size = 2) + 
+  theme_classic(base_size = 15) + 
+  labs(x = "Temperature (°F)",
+       y = "Residual") +
+  geom_hline(yintercept = 0, color="blue") + theme_grey()
+p2
+```
+
+## Assumption 4: normality
+
+```{r}
+environmental |> ggplot() + 
+  aes(sample = lresid) +
+  geom_qq(size = 2) + geom_qq_line()
+```
+- points reasonable close, some outliers in the lower corner => but is almost as good as you will ever see
+
+
+The **ggfortify** package provides an `autoplot()` method for `lm` objects.
+- Generates best plot for specific data
+```{r, fig.height=5.5, warning=FALSE}
+library(ggfortify)
+autoplot(lm2, which = 1:2)
+```
+
+# Interpreting model coefficients
+
+```{r}
+library(tidyverse)
+data(environmental, package = "lattice")
+environmental = environmental |> 
+  mutate(lozone = log(ozone))
+lm2 = lm(lozone ~ temperature, data = environmental)
+lm2
+```
+
+
+Aside: nicer model output, another way to output the model
+```{r}
+#install.packages("sjPlot")
+sjPlot::tab_model(
+  lm2, 
+  show.ci = FALSE,
+  dv.labels = "Log Ozone")
+```
+
+```{r, results = "asis"}
+install.packages("equatiomatic")
+library(equatiomatic)
+
+extract_eq(lm2)
+extract_eq(lm2, use_coefs = TRUE)
+```
+
+```{r}
+summary(lm2)$coefficients |> round(4)
+```
+
+CI for regression coefficients
+
+```{r}
+confint(lm2) |> round(3)
+```
+
+Or the `tab_model()` function from **sjPlot**.
+
+```{r}
+sjPlot::tab_model(lm2, dv.labels = "Log Ozone")
+```
+
+```{r}
+summary(lm2)
+```
+
+# Multiple regression
+
+```{r, message=FALSE}
+library(GGally)
+GGally::ggpairs(environmental)
+```
+
+```{r}
+lm3 = lm(lozone ~ radiation + temperature + wind, environmental)
+summary(lm3)$coefficients |> round(3)
+```
+
+## In-sample performance
+
+#### Simple linear regression model
+
+```{r}
+summary(lm2)$r.squared
+```
+
+#### "Full" model
+
+```{r}
+summary(lm3)$r.squared
+```
+
+```{r}
+sjPlot::tab_model(lm2, lm3, digits = 3, 
+                  show.ci = FALSE)
+```

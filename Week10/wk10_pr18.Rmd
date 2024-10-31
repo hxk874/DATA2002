@@ -1,0 +1,160 @@
+---
+title: "Untitled"
+output: html_document
+date: "2024-10-09"
+---
+
+# Prediction
+
+## Recall our fitted ozone model
+
+```{r}
+library(tidyverse)
+data(environmental, package = "lattice")
+environmental = environmental |> 
+  # linearity assumption: show that there weerent a good linear relation between ozone concentration and temperature -> fixed that by takeing the log(ozone).
+  mutate(lozone = log(ozone))
+
+# run the linear model, temp + some other predictors
+lm3 = lm(lozone ~ radiation + temperature + wind, environmental)
+lm3
+```
+hat: represnts an estimate
+
+## Assumption checks
+```{r}
+library(ggfortify)
+autoplot(lm3, which = 1:2)
+```
+
+
+## Prediction in R
+```{r}
+new_obs = data.frame(radiation = 200, temperature = 90, wind = 15)
+```
+
+```{r}
+# Two kinds of “prediction”
+
+predict(lm3, new_obs, interval = "prediction", level = 0.90)
+
+predict(lm3, new_obs, interval = "confidence", level = 0.90)
+```
+
+### Prediction vs confidence intervals
+
+```{r}
+predict(lm3, new_obs, 
+        interval = "prediction",
+        level = 0.90, se.fit = TRUE)
+```
+
+```{r}
+predict(lm3, new_obs, 
+        interval = "confidence",
+        level = 0.90)
+```
+
+```{r}
+qt(0.95, 107)
+```
+
+
+### Confidence and prediction intervals
+```{r}
+lm2 = lm(lozone ~ temperature, data = environmental)
+new_temp = data.frame(
+  temperature = seq(from = min(environmental$temperature),
+                    to = max(environmental$temperature),
+                    by = 0.1)
+)
+pred_int = predict(lm2, new_temp, interval = "prediction", level = 0.90) |> 
+  data.frame()
+conf_int = predict(lm2, new_temp, interval = "confidence", level = 0.90) |> 
+  data.frame()
+interval_df = data.frame(
+  pi_upper = pred_int$upr,
+  pi_lower = pred_int$lwr,
+  ci_upper = conf_int$upr,
+  ci_lower = conf_int$lwr,
+  temperature = new_temp$temperature
+)
+```
+
+```{r}
+environmental |> ggplot() + aes(x = temperature, y = lozone) + 
+  geom_point() + 
+  geom_line(data = interval_df, aes(y=pi_lower), color = "red", linetype = 2) +
+  geom_line(data = interval_df, aes(y=pi_upper), color = "red", linetype = 2) +
+  geom_line(data = interval_df, aes(y=ci_lower), color = "blue", linetype = 1) +
+  geom_line(data = interval_df, aes(y=ci_upper), color = "blue", linetype = 1)
+```
+
+```{r}
+environmental |> ggplot() + aes(x = temperature, y = lozone) + 
+  geom_point() + 
+  geom_line(data = interval_df, aes(y=pi_lower), color = "red", linetype = 2) +
+  geom_line(data = interval_df, aes(y=pi_upper), color = "red", linetype = 2) +
+  geom_line(data = interval_df, aes(y=ci_lower), color = "blue", linetype = 1) +
+  geom_line(data = interval_df, aes(y=ci_upper), color = "blue", linetype = 1) + 
+  geom_smooth(method = "lm", se = TRUE) 
+```
+
+
+# Categorical predictors
+
+## Fuel economy
+```{r}
+data("mpg", package = "ggplot2")
+glimpse(mpg)
+```
+
+Initial look at the data:
+```{r}
+mpg |> ggplot() + 
+  aes(x = cty) + 
+  geom_histogram(bins = 10)
+```
+
+Fuel economy by type of car:
+```{r}
+mpg |> ggplot() + 
+  aes(y = class, x = cty) + 
+  geom_boxplot()
+```
+
+Categorical predictors?!?!
+Think ANOVA!
+```{r}
+lm1 = lm(cty ~ class, data = mpg)
+summary(lm1)
+```
+
+How does this compare with ANOVA?
+Let’s compare with a one-way ANOVA:
+```{r}
+a1 = aov(cty ~ class, data = mpg)
+summary(a1)
+```
+
+What about the anova() function?
+If we apply the anova() function to each, they look are the same!
+lm() object
+```{r}
+anova(lm1)
+
+anova(a1)
+```
+
+
+What about emmeans()?
+```{r}
+
+```
+
+
+```{r}
+
+```
+
+

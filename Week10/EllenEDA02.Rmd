@@ -1,0 +1,345 @@
+---
+title: "Data2002 Project"
+date: "`r Sys.Date()`"
+author: ""
+format: 
+  html: 
+    embed-resources: true # Creates a single HTML file as output
+    code-fold: true # Code folding; allows you to show/hide code chunks
+    code-tools: true # Includes a menu to download the code file 
+table-of-contents: true # (Optional) Creates a table of contents
+number-sections: true # (Optional) Puts numbers next to heading/subheadings
+---
+
+
+```{r}
+# Maybe you need to run this:
+
+#install.packages("paletteer")
+#install.packages("qtlcharts")
+```
+
+```{r, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
+# Load necessary libraries
+library(dplyr)
+library(tidyr)
+library(janitor)
+library(tidyverse)
+
+# Plots
+library(ggplot2)
+library(gridExtra)
+library(paletteer)
+library(ggfortify)
+library(qtlcharts) # Heatmap
+
+# Model, analysis..
+library(car)        
+library(lmtest)     
+library(MASS) 
+library(leaps)
+library(caret)
+```
+ 
+
+
+# Project: EDA
+
+## Cleaning
+```{r}
+# Read in the datasets
+math_df <- read.table("Data/student-mat.csv", sep=";", header=TRUE)
+port_df <- read.table("Data/student-por.csv", sep=";", header=TRUE)
+
+# Merge the datasets
+df <- merge(port_df, math_df, by=c("school", "sex", "age", "address", "famsize", "Pstatus", 
+                                   "Medu", "Fedu", "Mjob", "Fjob", "reason", "nursery", "internet"))
+# Clean column names
+df <- df %>% clean_names()
+
+# Replace 'x' with 'math' and 'y' with 'port' in the column names
+df <- df %>% rename_with(~ gsub("_x", "_math", .), everything()) %>%
+              rename_with(~ gsub("_y", "_port", .), everything())
+colnames(df)
+```
+
+## Histograms
+```{r}
+# Math - G3 distribution
+p1 <- ggplot(df, aes(x = g3_math)) +
+  geom_histogram(binwidth = 1, fill = "#C24841FF", color = "black") + 
+  scale_fill_paletteer_d("nationalparkcolors::Acadia") +
+  labs(title = "Final Grade in Mathematics", x = "Grade (G3_mat)", y = "Frequency")
+
+# Portuguese - G3 distribution
+p2 <- ggplot(df, aes(x = g3_port)) +
+  geom_histogram(binwidth = 1, fill = "#476F84FF", color = "black") +
+  labs(title = "Final Grade in Portuguese", x = "Grade (G3_port)", y = "Frequency")
+
+grid.arrange(p1, p2, ncol = 2)
+```
+## Boxplot
+```{r}
+# Combine studytime for Math and Portuguese in one dataframe for boxplot
+studytime_df <- df %>%
+  select(studytime_math, studytime_port, g3_math, g3_port) %>%
+  pivot_longer(cols = c("studytime_math", "studytime_port"), names_to = "Subject", values_to = "studytime")
+
+# Combined boxplot for Study Time vs G3
+ggplot(studytime_df, aes(x = factor(studytime), 
+                         y = ifelse(Subject == "studytime_math", g3_math, g3_port), fill = Subject)) +
+  geom_boxplot() +
+  labs(title = "Final Grade (G3) vs. Study Time for both subjects", x = "Study Time", y = "Final Grade (G3)") +
+  scale_fill_manual(values = c("studytime_math" = "#C24841FF", "studytime_port" = "#476F84FF"),
+                    labels = c("studytime_math" = "Mathematics", "studytime_port" = "Portuguese")) + 
+  theme_gray()
+```
+## Scatter plot with fitted linear line
+```{r}
+# Create a new dataframe with combined data for Math and Portuguese
+combined_df <- df %>%
+  mutate(subject = "Mathematics", g2 = g2_math, g3 = g3_math) %>%
+  bind_rows(df %>% mutate(subject = "Portuguese", g2 = g2_port, g3 = g3_port))
+
+# Scatter plot for G3 as a function of G2 for both Math and Portuguese in the same plot
+ggplot(combined_df, aes(x = g2, y = g3, color = subject)) +
+  geom_point(alpha = 0.6) +
+  geom_smooth(method = "lm", se = FALSE, aes(color = subject)) +
+  
+  # Custom colors for Math and Portuguese
+  scale_color_manual(values = c("Mathematics" = "#C24841FF", "Portuguese" = "#476F84FF"),
+                     labels = c("Mathematics", "Portuguese")) +
+  
+  # Labels and theme
+  labs(title = "Final Grade (G3) vs. Second Period Grade (G2)",
+       x = "Second Period Grade (G2)",
+       y = "Final Grade (G3)",
+       color = "Subject") +
+  theme_grey()
+```
+
+
+# Project: Presentation
+
+Go with ´math´
+```{r}
+df <- read.table("Data/student-mat.csv", sep=";", header=TRUE)
+df <- df |> clean_names()
+```
+
+
+## Data exploration
+
+```{r}
+ggplot(df, aes(x = g3)) +
+  geom_histogram(binwidth = 1, fill = "#476F84FF", color = "black") + 
+  scale_fill_paletteer_d("nationalparkcolors::Acadia") +
+  labs(title = "Final Grade (G3) in Mathematics", x = "Point scale from [0, 20]", y = "Frequency")
+```
+
+
+# Heapmap, numeric variables
+```{r}
+# Select numerical columns for correlation (e.g., grades, absences, age)
+numerical_cols <- df[, sapply(df, is.numeric)]
+
+# Generate the correlation matrix
+cor_matrix <- cor(numerical_cols, use = "complete.obs")
+
+# Create an interactive heatmap using qtlcharts
+iplotCorr(cor_matrix)
+```
+
+
+## Initial full model 
+```{r}
+null_model <- lm(g3 ~ 1, data = df)
+full_model <- lm(g3 ~ ., data = df)
+
+summary(full_model)
+
+# Diagnostic plots
+autoplot(full_model, which = 1:3)
+```
+
+
+## Model selection
+
+From **Thursday session**, we found that the signficant variables are: 
+  ´sex´, ´mjob´, ´medu´, ´failures´, ´goout´
+
+### Backward selection
+
+```{r}
+step.back.aic <- step(full_model, 
+            direction = "backward", 
+            trace = FALSE) # set to TRUE, if you want to print all model selection outputs
+summary(step.back.aic)
+``` 
+
+Backward selection results:
+
+g3 $\sim$ school + age + activities + romantic + famrel +  walc + absences + g1 + g2
+
+
+### Forward selection
+```{r}
+# Perform forward selection
+step.fwd.aic <- step(null_model, 
+                  scope = list(lower = null_model, upper = full_model), 
+                  direction = "forward",
+                  trace = FALSE)
+summary(step.fwd.aic)
+```
+
+Forward selection results:
+
+g3 $\sim$ g2 + famrel + absences + g1 + age + activities +  walc + romantic + school
+
+### Comparing
+```{r}
+sjPlot::tab_model(step.fwd.aic, step.back.aic, show.ci = FALSE, show.aic = TRUE,
+                  dv.labels = c("Forward model", "Backward model"))
+```
+
+## Exhaustive search
+
+```{r}
+# Perform exhaustive search
+exhaustive_search <- regsubsets(g3 ~ ., data = df, nvmax = ncol(df) - 1)
+exhaustive_summary <- summary(exhaustive_search)
+
+# Find the model with the smallest BIC
+optimal_exhaustive_model <- which.min(exhaustive_summary$bic)
+exhaustive_summary$which[optimal_exhaustive_model, ]
+```
+
+Exhaustive search result: 
+
+G3 $\sim$ (Intercept) + age + famrel + absences + g1 + g2
+
+## ´train_control´ function
+
+```{r}
+# Set seed for reproducibility
+set.seed(123)
+
+# Define control for cross-validation
+train_control <- trainControl(method = "cv", 
+                              number = 10,   # k = 10
+                              repeats = 5)  
+```
+
+## CV of bwd/fwd selection model
+
+
+### Own model
+
+
+### Backward CV model
+```{r}
+# Fit the backward selection model
+bwd_full_model_cv <- train(
+  g3 ~ school + age + activities + romantic + famrel + walc + absences + g1 + g2, 
+  data = df, 
+  method = "lm", 
+  trControl = train_control)
+
+# Print results for backward selection model
+bwd_full_model_cv
+```
+
+### Forward CV model
+```{r}
+# Fit the backward selection model
+fwd_full_model_cv <- train(
+  g3 ~ g2 + famrel + absences + g1 + age + activities + walc + romantic + school, 
+  data = df, 
+  method = "lm", 
+  trControl = train_control)
+
+# Print results for backward selection model
+fwd_full_model_cv
+```
+
+
+### CV of exhaustive search model
+
+```{r}
+# Fit the model using cross-validation
+cv_model <- train(g3 ~ g1 + g2 + famrel,
+                  data = df, method = "lm", 
+                  trControl = train_control)
+
+# View the results
+cv_model
+```
+
+```{r}
+exh_leaps = regsubsets(g3 ~., data = df, nvmax = 10)
+summary(exh_leaps)$outmat
+
+exh = lmSubsets(g3 ~ ., data = df, nbest = 10)
+plot(exh)
+```
+
+
+
+## New model
+```{r}
+df2 <- read.table("Data/student-mat.csv", sep=";", header=TRUE)
+df2 <- df2 |> clean_names()
+
+df2 <- subset(df, select = -c(g1, g2))
+```
+
+```{r}
+null_model <- lm(g3 ~ 1, data = df2)
+full_model <- lm(g3 ~ ., data = df2)
+```
+
+```{r}
+# Perform backward selection
+step.back.aic <- step(full_model, 
+            direction = "backward", 
+            trace = FALSE) # set to TRUE, if you want to print all model selection outputs
+#summary(step.back.aic)
+``` 
+
+```{r}
+# Perform forward selection
+step.fwd.aic <- step(null_model, 
+                  scope = list(lower = null_model, upper = full_model), 
+                  direction = "forward",
+                  trace = FALSE)
+#summary(step.fwd.aic)
+```
+
+
+```{r}
+sjPlot::tab_model(step.fwd.aic, step.back.aic, show.ci = FALSE, show.aic = TRUE,
+                  dv.labels = c("Forward model", "Backward model"))
+```
+
+## Exhaustive search
+
+```{r}
+# Perform exhaustive search
+exhaustive_search <- regsubsets(g3 ~ ., data = df2, nvmax = ncol(d2)-1)
+exhaustive_summary <- summary(exhaustive_search)
+
+# Find the model with the smallest BIC
+optimal_exhaustive_model <- which.min(exhaustive_summary$bic)
+exhaustive_summary$which[optimal_exhaustive_model, ]
+```
+
+
+```{r}
+exh_leaps = regsubsets(g3 ~., data = df2, nvmax = ncol(d2)-1)
+summary(exh_leaps)$outmat
+```
+
+```{r}
+exh = lmSubsets(g3 ~ ., data = df2, nbest = ncol(d2)-1)
+plot(exh)
+```

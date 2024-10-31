@@ -1,0 +1,666 @@
+---
+title: "Lab 07"
+date: "2024-09-12"
+author: "Ellen Ebdrup"
+output: 
+  html_document: 
+    ### IMPORTANT ###
+    # self_contained: true # Creates a single HTML file as output
+    code_folding: show # Code folding; allows you to show/hide code chunks
+    ### USEFUL ###
+    code_download: true # Includes a menu to download the code file
+    ### OPTIONAL ###
+    df_print: paged # Sets how dataframes are automatically printed
+    theme: readable # Controls the font, colours, etc.
+    toc: true # (Useful) Creates a table of contents!
+    toc_float: true # table of contents at the side
+    number_sections: false # (Optional) Puts numbers next to heading/subheadings
+---
+
+# Lecture Recap
+
+## Bootstrapping
+```{r}
+knitr::include_graphics("images/lab1.png")
+```
+
+## Permutation test for paired/single sample data
+
+**Workflow**
+
+1. Compute differences between two measurements (paired sample) or differences between sample data and the null hypothesised mean (one sample)
+
+2. Randomly permute (resample) the signs of differences with replacement lots of times
+
+3. Assign these randomly permuted signs to the original differences
+
+4. For each resampled data with randomly permuted signs of differences, perform a one sample t-test to extract the test statistic
+
+5. Compute the proportion of test statistics, as or more extreme than the original test statistic 👉 a permutation test p-value
+
+- What if there are outliers?
+- Wilcoxon signed-rank test (Think about why it’s more robust than the t-test)
+
+## Permutation test for two independent sample data
+
+**Workflow**
+ 
+1. Combine two independent samples  
+2. Consider all possible $(n_x + n_y)!$ permutations (or a random subset of permutations)  
+3. Randomly resample class labels $(X, Y)$ for all possible permutation times or for pre-specified number of times.  
+4. For each of the re-sampled (permuted) data, perform a two-sample t-test to extract the test statistic. Although we perform the t-test, we’re not really using the t-distribution. We’re just borrowing the test statistic not caring about its distribution $\to$ Non-parametric  
+
+5. Compute the proportion of test statistics, as or more extreme than the original t-test statistic $\to$ a permuted p-value
+
+- What if there are outliers?
+- When there are outliers we can’t simply remove them unless it’s valid to do so (e.g. incorrect data), as they’re also a part of our data.
+- Instead, we use a more robust test to extract the test statistic
+- Wilcoxon rank-sum test (Think about why it’s more robust than the t-test)
+
+```{r}
+library(tidyverse)
+library(ggplot2)
+library(knitr)
+library(dplyr)
+```
+
+
+## Group work
+```{r}
+sample(1:6, 2, replace = TRUE)
+sample(1:6, 2, replace = TRUE)
+sample(1:6, 2, replace = TRUE)
+sample(1:6, 2, replace = TRUE)
+sample(1:6, 2, replace = TRUE)
+sample(1:6, 2, replace = TRUE)
+```
+
+2. Using your individual sample, estimate the distribution of the sample mean using bootstrap resampling. Use 200 bootstrap resamples. Calculate a bootstrap confidence interval for the population mean average house price of the street.
+
+```{r}
+pop = c(2.1,	2.4,	5.9,	2.8,	2.9,	6.4)
+```
+
+
+```{r}
+set.seed(12)
+sample(pop, 6, replace= FALSE)
+```
+
+you cant use $t^*$, when you don't know the underlying dist, thus use bootstrapping instead. 
+
+
+
+# Lab Questions
+
+## Speed of light
+
+In the lecture, we discussed a famous dataset where Simon Newcomb measured the time required for light to travel from his laboratory on the Potomac River to a mirror at the base of the Washington Monument and back, a total distance of about 7400 meters. You can download the data file that contains 66 sets of measurements used to estimate the speed of light.
+
+Getting started: Read in the data and check the size of your data.
+
+```{r}
+library(tidyverse)
+speed_file = read_csv("https://raw.githubusercontent.com/DATA2002/data/master/speed_of_light.txt")
+speed = speed_file$Speed_of_Light
+
+ggplot(speed_file, aes(x="", y = Speed_of_Light)) + 
+  geom_boxplot(colour = "red", outlier.size = 2) + 
+  theme_classic(base_size = 16) + 
+  labs(x = "", y = "Speed") + coord_flip()
+```
+
+a. **Generate one bootstrap sample and compare this sampled data with the original data.**
+
+Not a population data, this is a sample 
+
+The easiest thing would be to generate side by side boxplots:
+```{r}
+speedb1 = sample(speed, replace=TRUE)
+par(mar = c(4,5.5,1,1))
+boxplot(speed, speedb1, horizontal = TRUE, las = 1,
+        names = c("Original","Resampled"), 
+        xlab = "Speed")
+
+# Ths code does the same:
+true_mean = mean(speed) # 26.212
+
+set.seed(123)
+my_sam = sample(speed, 66, replace = TRUE)
+
+# compare using a boxplot
+boxplot(speed, my_sam, horizontal = TRUE)
+```
+
+We could also generate something like a Q-Q plot, by plotting the sorted original data against the sorted bootstrap data.
+
+```{r}
+## qqplot
+df = data.frame(original_sample = sort(speed), 
+                bootstrap_sample = sort(speedb1))
+ggplot(df, aes(x = original_sample, y = bootstrap_sample)) + 
+  geom_point() + 
+  geom_abline(slope = 1, intercept = 0) + 
+  coord_equal() + 
+  labs(y = "Bootstrap sample", x = "Original sample")
+```
+
+
+b. **Compute the mean and median of the bootstrap sample and compare with the corresponding values in the original data.**
+
+Garth solution:
+```{r}
+df |> summarise(
+  across(
+    .cols = everything(),
+    .fns = list(mean = mean, median =  median)
+  )) |> 
+  gt::gt() |> 
+  gt::tab_spanner(label = "Original sample", columns = starts_with("original")) |> 
+  gt::tab_spanner(label = "Bootstrap sample", columns = starts_with("bootstrap")) |> 
+  gt::cols_label(ends_with("mean") ~ "Mean",
+                 ends_with("median") ~ "Median") |> 
+  gt::fmt_number()
+
+df |>
+  pivot_longer(cols = everything(),
+               names_to = "sample",
+               values_to = "speed") |>
+  ggplot(aes(y = sample, x = speed)) +
+  geom_boxplot() + 
+  labs(x = "Speed", y = NULL)
+```
+
+
+```{r}
+# or in base R:
+# mean(speedb1)
+# mean(speed)
+# median(speedb1)
+# median(speed)
+# boxplot(df)
+
+length(speed)
+(diff = speed-my_sam)
+mean(my_sam)
+mean(diff)
+median(diff)
+```
+
+
+c. **Draw another bootstrap sample and repeat the comparison. Repeat this 20 times and see if your conclusion changes. Inspect first ten bootstrap estimates of the mean.**
+Visualize the result. Hint: Write a for loop (see example in lecture slides).
+
+```{r}
+bt_res = NULL
+
+for(i in 1:20){
+  bs_sample = sample(speed, replace = TRUE)
+  bt_res[i] = mean(bs_sample)
+}
+bt_res[1:10]
+```
+
+Garth solution:
+```{r}
+B = 20
+speedbmean = numeric(B)
+for (i in 1:B) {
+  resampled_data = sample(speed, replace = TRUE)
+  # boxplot(speed, resampled_data)
+  speedbmean[i] = mean(resampled_data)
+}
+speedbmean[1:10]
+```
+
+```{r}
+hist(speedbmean)
+abline(v = mean(speed), col="red", lwd = 1)
+```
+From above, we can see that the distribution of 20 bootstrap sample means are centered around the original sample mean.
+
+d. **Typically one draws a large number of bootstrap samples, say 1000 or more. Try different numbers of bootstrap samples and see how the shape of the histogram changes.**
+
+```{r}
+B = 5000
+speedbmean2 = numeric(B)
+for (i in 1:B) {
+  resampled_data = sample(speed,replace=TRUE)
+  speedbmean2[i] = mean(resampled_data)
+}
+hist(speedbmean2)
+abline(v = mean(speed), col="red")
+```
+Once you get up around 1000, 5000, 10000, 100000, the shape of the histogram stays almost exactly the same, i.e. there’s not really any advantage to taking larger and larger bootstrap resamples.
+
+
+e. Find a 95% bootstrap confidence interval for the mean using the 2.5 and 97.5 percentiles as the confidence limits. 
+Compare this with a “traditional” confidence interval that uses the $t$-distribution.
+
+```{r}
+quantile(speedbmean,c(0.025,0.975))
+```
+
+```{r}
+n = length(speed)
+mean(speed) + qt(c(0.025,0.975), n-1)*sd(speed)/sqrt(n)
+```
+If we compare the bootstrap 95% confidence interval to the original 95% confidence interval, they’re quite similar to each other.
+A key takeaway is as we increase the number of bootstrap samples, the resulting bootstrap confidence interval will get closer to the original confidence interval. However, there’s no point in having more bootstrapping samples at some point, as mentioned above.
+
+$$[\bar{x} - t^* \frac{s}{\sqrt{n}} , \bar{x} + t^* \frac{s}{\sqrt{n}} ]$$
+
+$$[26.212 - t^* \frac{s}{\sqrt{66}} , 26.212 + t^* \frac{s}{\sqrt{66}} ]$$
+
+
+
+f. Generate 95% bootstrap confidence intervals calculation for the median and the MAD ('Median absolute deviation').
+
+```{r}
+B = 10000
+speedbmed = speedbmad = numeric(B)
+for (i in 1:B) {
+  resampled_data = sample(speed,replace=TRUE)
+  speedbmed[i] = median(resampled_data)
+  speedbmad[i] = mad(resampled_data)
+}
+# the median distribution is quite discrete
+speedbmed[1:10]
+```
+
+```{r}
+plot(table(speedbmed))
+
+hist(speedbmed)
+abline(v = median(speed), col="red")
+```
+
+```{r}
+quantile(speedbmed,c(0.025,0.975))
+```
+
+
+```{r}
+# the mad distribution is also quite discrete
+plot(table(speedbmad))
+
+hist(speedbmad)
+abline(v = mad(speed), col="red")
+```
+
+```{r}
+quantile(speedbmad,c(0.025,0.975))
+```
+
+
+## Cotinine
+
+single sample group
+
+If the data follows a N, then we can do t-test
+
+A variant of nicotine found in cigarettes is cotinine (which, not coincidentally, is an anagram of nicotine). It is found in the blood stream and the amount is proportional to the amount of exposure a person has to tobacco smoke. Therefore, cotinine is used as an indicator of tobacco smoke exposure. For example, cotinine levels < 10 ng/ml are considered to be consistent with no active smoking; values between 10 - 100 ng/ml are associated with light smoking, or moderate passive exposure while heavy smokers have at least 300 ng/ml. Levels in active smokers typically reach 500 ng/ml.
+
+The following data lists the cotinine levels of 40 passive smokers who are not smokers of tobacco products.
+```{r}
+x = c(0, 87, 173, 253, 1, 103, 173, 265, 1, 112, 198, 266, 3, 121, 
+      208, 277, 17, 123, 210, 284, 32, 130, 222, 289, 35, 131, 227,
+      290, 44, 149, 234, 313, 48, 164, 245, 477, 86, 167, 250, 491)
+```
+
+a. **Calculate some simple descriptive measures of the data, construct a histogram and a Q-Q plot. Provide a brief description of the sample data.**
+
+```{r}
+summary(x)
+```
+notice:
+- mean and median pretty close
+- 2 outliers - e.i. Max. => skewed to the right
+    We should not remove them or ignore them
+
+
+```{r}
+# plot histogram and Q-Q plot
+par(mfrow = c(1,2), mar = c(4,4,1,1))
+hist(x, breaks = 8, main = "", xlab = "Cotinine levels (ng/ml)")
+qqnorm(x, main = "")
+qqline(x)
+```
+Not perfectly in proportions with N => permutation test 
+
+While the mean and the median are similar, graphically there does appear to be some skewness with two quite large observations that stand out from the bulk of the data. While the histogram doesn’t look particularly “normal” the Q-Q plot looks mostly OK, in the sense that most points lie close to the diagonal line, apart from the two large observations and some minor departure from the line at the natural lower bound of zero.
+
+
+b.**Based on your descriptive summary of the data, do you think there are any outlying, or unusually large, observations that may impact upon any inferential test that you perform? In your description, take into consideration the summary statistics and histogram of the remaining data.**
+
+One may argue that perhaps the skewness is due to a few outlying observations - for example the cotinine levels of 477 and 491. However these may be the cotinine levels of regular heavy smokers. So it would not be impossible to obtain observations as extreme as these - the description of cotinine levels even suggests this. So we should not ignore them or remove them from the data.
+
+c. **Using R and the complete sample, perform a standard $t$-test of the hypotheses $H_0 : \mu=130$ vs $H_1 : \mu \neq 130$. At the 5% level of significance, what can you conclude about the cotinine levels of the smokers in the population?**
+
+
+40 observations: df=39
+```{r}
+t.test(x, mu=130)
+```
+The p-value is 0.03, less than 0.05 therefore we reject the null hypothesis at the 5% level of significance and conclude that the true mean cotinine level is not equal to 130.
+
+
+d. Perform a sign test to test $H_0 : \mu=130$ vs $H_1 : \mu \neq 130$.
+```{r}
+x1 = x[x != 130]
+length(x)
+bigger = x1 > 130
+table(bigger)
+```
+24 out of 39 are greater than 130.
+
+```{r}
+barplot(dbinom(0:39,39,0.5), names=0:39, col=c(rep("blue",16), rep("white",8), rep("blue",15)))
+```
+
+Perform a binom test
+15 negative differences
+```{r}
+2*(pbinom(15, 39, 0.5)) # = 0.1996
+2*(1 - pbinom(23, 39, 0.5)) # = 0.1996
+
+# easier method
+binom.test(table(bigger))
+```
+Using the sign test we do not reject the null hypothesis at the 5% level of significance as the p-value is larger than 0.05.
+
+**Perform a permutation test by generating 10,000 resamples. What conclusion do you reach based on the permutation test p-value?**
+
+Remembering the importance of exchangeablility, we can’t just resample our observations with replacement (like in the bootstrap). Since this is a test of a mean, to make our randomisation p-value we need to randomly sample variation around the mean. We do this by randomly assigning a sign change to the differences between the data and the hypothesised mean. In this way, the (mean-adjusted) data stays the same except for a potential sign change which is what generates our null distribution.
+
+```{r}
+repetitions = 10000
+hyp_mean = 130
+n = length(x)
+```
+
+Under $H_0$, the data has a mean of 130. Re-centre the data by this. Under $H_0$, random re-labelling of the absolute values of the centred data should have a mean of zero.
+```{r}
+diff_data = x - hyp_mean
+dbar = mean(diff_data)
+rando_means = numeric(repetitions)
+set.seed(1)
+for (i in 1:repetitions){
+  permuted_signs = sample(c(-1, 1), n, replace = TRUE)
+  permuted_data = permuted_signs * diff_data
+  rando_means[i] = mean(permuted_data)
+}
+pval = mean(abs(rando_means) >= abs(dbar))
+plot(density(rando_means), main = "")
+abline(v = dbar, col = "red")
+abline(v = -dbar, col = "red")
+```
+
+The permutation test p-value is 0.0287 which is less than 0.05 so we reject the null hypothesis.
+
+Note that rather than just considering the mean as our test statistic, we could instead have used a t-test test statistic and compared this to the observed t-test test statistic:
+```{r}
+n = length(x)
+diff_data = x - hyp_mean
+tstat = mean(diff_data)/(sd(diff_data)/sqrt(n))
+rando_ts = numeric(repetitions)
+set.seed(1)
+for (i in 1:repetitions){
+  permuted_signs = sample(c(-1, 1), n, replace = TRUE)
+  permuted_data = permuted_signs * diff_data
+  rando_ts[i] = mean(permuted_data)/(sd(permuted_data)/sqrt(n))   
+}
+pval = mean(abs(rando_ts) >= abs(tstat))
+```
+
+
+e. **Which of the procedures above provides the more appropriate inference of the population mean. Why?**
+
+both the one-sample t-test and the permutation test, lets us reject the null hypothesis, since the normality assumption is not heavaly violated
+
+Given there was a some question about the normality assumption (the extremes of the Q-Q plot weren’t perfectly on the line), the permutation test is the most reliable here, as it does not assume the observations are sampled from a normal population.
+
+However, in this case the -test would also likely be fine as the departure from normality wasn’t very severe and sample size is just large enough for the central limit theorem to ensure approximately valid inferences.
+
+f. **Generate 95% bootstrap confidence intervals for the standard deviation and the median absolute deviation from the median (MAD). Plot histograms of both bootstrap distributions. Which of these two estimators of scale is more reliable in this setting.**
+
+```{r}
+B = 10000
+sd_boot = numeric(B)
+mad_boot = numeric(B)
+for(i in 1:B){
+  boot_sample = sample(x, replace = TRUE)
+  sd_boot[i] = sd(boot_sample)
+  mad_boot[i] = mad(boot_sample)
+}
+quantile(sd_boot, c(0.025, 0.975))
+```
+
+```{r}
+quantile(mad_boot, c(0.025, 0.975))
+```
+
+```{r}
+diff(quantile(sd_boot, c(0.025, 0.975)))
+
+diff(quantile(mad_boot, c(0.025, 0.975)))
+```
+
+The length of the bootstrap confidence interval for the standard deviation is 55.0503663, which is narrower than the length of the confidence interval for the median absolute deviation from the median, 85.9908.
+
+g. **Say we were interested in the coefficient of variation, $CV = s / \bar{x}$, for this data set. Generate a 90% bootstrap confidence interval for the coefficient of variation.**
+
+```{r}
+B = 10000
+bs_cv = numeric(B)
+for(i in 1:B){
+  boot_sample = sample(x, replace = TRUE)
+  bs_cv[i] = sd(boot_sample)/mean(boot_sample)
+}
+quantile(bs_cv, c(0.05, 0.95))
+```
+
+```{r}
+hist(bs_cv, main = "")
+```
+
+The 90% bootstrap confidence interval for the coefficient of variation is (0.54, 0.84).
+
+
+## Cereal
+
+This cereal data is taken from Data Description, Inc. (2021) and can be downloaded from https://raw.githubusercontent.com/DATA2002/data/master/Cereal.csv.
+
+One of the variable `mfr` represents the manufacturer of cereal where 
+  A = American Home Food Products, 
+  G = General Mills, 
+  K = Kelloggs, 
+  N = Nabisco, 
+  P = Post, 
+  Q = Quaker Oats, 
+  R = Ralston Purina.
+
+Getting started: 
+- Read the data from the website. 
+- Check the size of your data. 
+- Think about what the number of rows actually means.
+```{r}
+cereal = read_csv("https://raw.githubusercontent.com/DATA2002/data/master/Cereal.csv", na = "-1")
+# if you've downloaded it to your computer
+# cereal = read_delim("Cereals.txt", delim = "\t", na = "-1")
+## Looking at the start of the data
+dplyr::glimpse(cereal)
+```
+
+a. **Produce some basic summary statistics the nutrients “sugar” and “sodium”**
+```{r}
+# summary(cereal)
+```
+
+```{r}
+summary(cereal$sugars)
+boxplot(cereal$sugars, horizontal = TRUE)
+```
+
+```{r}
+summary(cereal$sodium)
+boxplot(cereal$sodium, horizontal = TRUE)
+```
+
+Garth solution:
+```{r}
+cereal |> drop_na(sugars, sodium) |> 
+  summarise(
+    across(.cols = c(sugars, sodium),
+           .fns = list(Mean = mean,
+                       SD = sd,
+                       Min = min,
+                       Max = max, 
+                       Q2 = ~ quantile(.x,0.25),
+                       Q3 = ~ quantile(.x,0.75))
+    )) |> 
+  tidyr::pivot_longer(cols = everything(),
+                      names_sep = "_",
+                      names_to  = c("nutrient", ".value")) |> 
+  knitr::kable(digits = 2)
+```
+
+table1 function is handy for the same as above:
+```{r}
+install.packages(table1)
+table1::table1(~ sugars + sodium, data = cereal)
+```
+
+
+2. **Restricting attention to G = General Mills and K = Kellogg’s cereals, visualise the distribution of sodium content between the two manufacturers. Does it look like there is equal variance between the two groups? Could you safely assume normality within each group?**
+
+
+```{r}
+test_dat = cereal |> 
+  filter(mfr %in% c("G", "K")) |> 
+  drop_na(sugars) |> 
+  mutate(mfr = case_when(
+    mfr == "G" ~ "General Mills",
+    mfr == "K" ~ "Kellogg's",
+    TRUE ~ mfr
+  ))
+test_dat |> 
+  ggplot() + 
+  aes(x = mfr, y = sodium) + 
+  geom_boxplot() + 
+  coord_flip() +
+  labs(x = NULL, y = "Sodium content")
+```
+Fig: it looks like there is a difference in spread between two manufacturers, with Kellogg’s appearing to have larger variation than General Mills. So we wouldn’t be too comfortable using the `equal.var = TRUE` option if we were to perform a `t.test()`.
+- Do Welch two sample t-test
+
+To assess the normality within each group, we can use a Q-Q plot and facet by manufacturer.
+```{r}
+test_dat |> 
+  ggplot(aes(sample = sodium)) + 
+  geom_qq() + geom_qq_line() + 
+  facet_wrap(vars(mfr)) +
+  labs(y = "Sodium content", x = "Theoretical quantiles") 
+```
+
+Fig: the General Mills Q-Q plot shows some departure from the line at both ends of the distribution (indicating heavier tails than a normal distribution). The points are mostly close to the line in the Kellogg’s sample, except for two cereals which have zero sodium. We’re not totally confident in the normality assumption, though it may still be OK to use a $t$-test because the observations are not wildly far from the line and we have a reasonably large number of observations, so we could instead rely on the central limit theorem to ensure the test statistic at least approximately follows a $t$-distribution.
+
+
+3. **Perform a permutation test to test whether there is a significant difference in the mean sodium content between the two manufacturers.**
+
+check if length of G and K is the same.
+
+if perm to big, do random instead
+
+wilcox:
+  keep smae number of data
+  shuffle around, 10000 rep
+  
+plot:
+  red line: obs t0
+
+abs(everything) --> new plot
+-> new t0
+
+first: how we would normally do it
+
+Instead of using a two-sample t-test type test statistic, let’s do a permutation test using the Wilcoxon rank-sum test statistic as our measure of discrepancy between the two group means (or medians).
+```{r}
+# specify exact = FALSE because there are ties and I don't want it to
+# print the warning message when it defaults to exact = FALSE
+t0 = wilcox.test(sodium ~ mfr, data = test_dat, exact = FALSE)
+t0
+```
+
+```{r}
+B = 10000 # number of permuted samples we will consider
+permuted_dat = test_dat # make a copy of the data
+t_null = vector("numeric", B) # initialise outside loop
+for(i in 1:B) {
+  permuted_dat$mfr = sample(test_dat$mfr) # this does the permutation
+  t_null[i] = wilcox.test(sodium ~ mfr,
+                          data = permuted_dat, 
+                          exact = FALSE)$statistic
+}
+data.frame(t_null) |> 
+  ggplot() + 
+  aes(x = t_null) + 
+  geom_histogram(alpha = 0.5) + 
+  geom_vline(xintercept = abs(t0$statistic), col = "red", lwd = 1) + 
+  labs(x = "Test statistic", y = "Count") 
+```
+
+It’s a two sided test, so let’s center that distribution at its theoretical mean and consider the absolute value of the test statistic distribution. The method of calculating the test statistic given in the lecture notes has a corresponding mean of $n_x(N+1)/2$. The test statistic used by R is equivalent but a bit different to what we defined in class, it’s different by a shift of $n_x(n_x + 1)/2$  so we need to calibrate our mean to match the definition of the test statistic used by R:
+```{r}
+n_x = 22
+n_y = 23
+N = n_x + n_y
+mu_W = n_x*(N+1)/2
+t_mean = mu_W - n_x*(n_x + 1)/2
+data.frame(t_null = t_null - t_mean) |> 
+  ggplot() + 
+  aes(x = abs(t_null)) + 
+  geom_histogram(boundary = 0, alpha = 0.5) + 
+  geom_vline(xintercept = abs(t0$statistic - t_mean),
+             col = "red", lwd = 1) + 
+  labs(x = "Absolute value of the test statistic", y = "Count") 
+```
+
+We can calculate our permutation p-value:
+```{r}
+mean(abs(t_null-t_mean) >= abs(t0$statistic-t_mean))
+```
+
+The permutation p-value is large (much larger than 0.05), so we do not reject the null hypothesis and conclude that there’s no significant difference between the mean sodium content of the two manufacturers.
+
+We could also do all this using a t-test type test statistic:
+```{r}
+t0 = t.test(sodium ~ mfr, data = test_dat)
+t0
+```
+
+```{r}
+B = 10000 # number of permuted samples we will consider
+permuted_dat = test_dat # make a copy of the data
+t_null = vector("numeric", B) # initialise outside loop
+for(i in 1:B) {
+  permuted_dat$mfr = sample(test_dat$mfr) # this does the permutation
+  t_null[i] = t.test(sodium ~ mfr, data = permuted_dat)$statistic
+}
+```
+
+```{r}
+data.frame(t_null = t_null) |> 
+  ggplot() + 
+  aes(x = abs(t_null)) + 
+  geom_histogram(boundary = 0, alpha = 0.5) +
+  geom_vline(xintercept = abs(t0$statistic), col = "red", lwd = 1) + 
+  labs(x = "Absolute value of the test statistic", y = "Count") 
+```
+
+
+We can calculate our permutation p-value:
+```{r}
+mean(abs(t_null) >= abs(t0$statistic))
+```
+Again, the permutation p-value is large (much larger than 0.05), so we do not reject the null hypothesis and conclude that there’s no significant difference between the mean sodium content of the two manufacturers.

@@ -1,0 +1,100 @@
+---
+title: "wk11_pr20"
+output: html_document
+date: "2024-10-13"
+---
+
+# Logistic regression
+
+## Titanic survival
+```{r}
+library(tidyverse)
+install.packages("vcdExtra")
+data("Titanicp", package = "vcdExtra")
+Titanicp
+```
+
+```{r}
+Titanicp %>% group_by(survived, pclass) %>% count() %>%
+  ggplot(aes(x = pclass, y = n, fill = survived)) + 
+  geom_bar(stat = "identity", position = "fill") +
+  scale_y_continuous(labels = scales::percent) + 
+  labs(y = "", x = "Passenger class", fill = "Survival status")
+
+Titanicp %>% group_by(survived, sex) %>% count() %>%
+  ggplot(aes(x = sex, y = n, fill = survived)) + 
+  geom_bar(stat = "identity", position = "fill") +
+  scale_y_continuous(labels = scales::percent) + 
+  labs(y = "", x = "Sex", fill = "Survival status")
+```
+
+```{r}
+Titanicp %>% 
+  ggplot() + 
+  aes(x = age, fill = survived) + 
+  geom_density(alpha = 0.5)
+```
+
+```{r}
+Titanicp %>% ggplot() + 
+  aes(x = age, fill = survived) + 
+  geom_density(alpha = 0.5) + 
+  facet_grid(~pclass)
+```
+
+## Linear regression
+
+### Titanic
+```{r}
+x = Titanicp %>% mutate(survived = ifelse(survived == "survived", 1, 0))
+glimpse(x)
+```
+
+### Fit a logistic regression model
+```{r}
+glm1 = glm(survived ~ pclass + sex + age, family = binomial, data = x)
+summary(glm1)
+
+glm1
+```
+
+```{r}
+new_data = data.frame(pclass = "1st", sex = "male", age = 0)
+predict(glm1, newdata = new_data, type = "link")
+```
+
+```{r}
+new_data = data.frame(pclass = "1st", sex = "male", age = 0)
+predict(glm1, newdata = new_data, type = "response")
+```
+
+## Outputting your model coefficients
+
+The sjPlot package has some nice functions for outputting regression models.
+```{r}
+library(sjPlot)
+tab_model(glm1, transform = NULL)
+
+# Without the transform = NULL parameter, it will exponentiate the coefficients:
+tab_model(glm1, show.ci = FALSE, 
+          show.r2 = FALSE)
+```
+
+### Visualising your model coefficients
+```{r}
+# Log-odds scale 
+plot_model(glm1, transform = NULL)
+
+# Odds scale
+plot_model(glm1) 
+```
+
+### Visualising predictions
+```{r}
+plot_model(glm1, type = "pred", terms = c("age", "sex", "pclass"), show.data = TRUE) + 
+  labs(title = "", y = "Predicted survival\nprobability", x = "Age", colour = "")
+```
+
+
+
+

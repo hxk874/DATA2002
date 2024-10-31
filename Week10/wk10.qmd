@@ -1,0 +1,363 @@
+---
+title: "Live lecture: Assessing performance"
+format: html
+---
+
+# In sample performannce
+
+## Fitted ozone model
+```{r}
+library(tidyverse)
+data(environmental, package = "lattice")
+environmental = environmental |> 
+  mutate(lozone = log(ozone))
+lm2 = lm(lozone ~ temperature, data = environmental)
+lm3 = lm(lozone ~ radiation + temperature + wind, environmental)
+```
+
+## In sample performance vs out of sample performance
+
+In sample: $r^2$, comparing the simple linear regression to the full model
+
+```{r}
+summary(lm2)$r.squared # lozone ~ temperature
+
+summary(lm3)$r.squared # lozone ~ radiation + temperature + wind
+```
+
+Out of sample: How well do we predict observations that we didn’t use to build the model?
+
+# Out of sample performance
+
+## Comparing simple linear regression with the full model
+
+Out of sample performance
+We could think about building a training set and using it to predict observations from a test set.
+```{r}
+n = nrow(environmental)
+n
+```
+
+```{r}
+# this box is from the slides
+n_train = floor(0.8*n)
+n_test = n - n_train
+grp_labs = rep(c("Train","Test"), times = c(n_train, n_test)) 
+environmental$grp = sample(grp_labs)
+train_dat = environmental |> filter(grp == "Train")
+lm_simple_train = lm(lozone ~ temperature, data = train_dat)
+lm_full_train = lm(lozone ~ radiation + temperature + wind, data = train_dat)
+test_dat = environmental |> filter(grp == "Test")
+simple_pred = predict(lm_simple_train, newdata = test_dat)
+full_pred = predict(lm_full_train, newdata = test_dat)
+```
+
+Split the data
+```{r}
+n_train = floor(0.8*n) # 88
+n_test = n - n_train # 23
+```
+
+
+```{r}
+set.seed(1) # for reuse ability
+grp_labs = rep(c("Train","Test"), times = c(n_train, n_test)) 
+table(grp_labs)
+# sample group labs without replacement
+# st we achieve random sampling 
+environmental$grp =  sample(grp_labs, replace = FALSE) 
+```
+
+See the environmental data
+```{r}
+environmental
+```
+
+
+```{r}
+train_dat = environmental |> filter(grp == "Train") # take the train group
+test_dat = environmental |> filter(grp == "Test")
+```
+
+fit our model on our training data:
+```{r}
+lm_simple_train = lm(lozone ~ temperature, data = train_dat)
+lm_full_train = lm(lozone ~ radiation + temperature + wind, data = train_dat)
+```
+
+
+### Root mean squared error (RMSE)
+
+Residuals: difference from what we predicted vs. true value using the same data set
+
+How can we compare the predictions from the two models? Compare them to the observed values using the root mean square error:
+$$RMSE = \sqrt{\frac{\sum_{i=1}^n (y_i-\hat{y}_i)^2}{n}}$$
+$n$: number of train data points
+$\hat{y}_i$ : predicted
+
+$(y_i-\hat{y}_i)^2$ : squared prediction error
+
+predict on out test data
+```{r}
+simple_pred = predict(lm_simple_train, newdata = test_dat)
+full_pred = predict(lm_full_train, newdata = test_dat)
+```
+
+```{r}
+simple_mse = mean((test_dat$lozone - simple_pred)^2)
+sqrt(simple_mse)
+```
+
+```{r}
+full_mse = mean((test_dat$lozone - full_pred)^2)
+sqrt(full_mse)
+```
+
+
+### Mean absolute error
+An alternative measure of performance, less influenced by outliers
+- a bit more robust, since it is not squared
+$$MAE = \frac{\sum_{i=1}^m | y_i-\hat{y}_i |}{m}$$
+$m$: number of test data points
+```{r}
+simple_mae = mean(abs(test_dat$lozone - simple_pred))
+simple_mae
+```
+
+
+```{r}
+full_mae = mean(abs(test_dat$lozone - full_pred))
+full_mae # = 0.47 
+```
+In the slide code, the `full_mae` is a little lower since there wasn't set a seed. 
+
+
+# Cross validation
+
+k-fold cross-validation (CV) estimation
+-Data randomly divided into k subsets of (nearly) equal size
+- Estimate your model by leaving one subset out
+- Use your estimated model to predict the observations left out
+- Compute error rates on the left out set
+- Repeat k times (for each of the subsets)
+- Average the error rate over the k runs
+
+Bias-variance tradeoff: smaller k can give larger bias but smaller variance
+
+Computationally intensive.
+
+often called *leave one out* cross validation
+
+## 10-fold cross validation
+
+**Step 1**: divide our data up into 10 folds there are 111 observations, so we have 9 folds of 11 observations and 1 fold of 12 observations.
+```{r}
+set.seed(2)
+nrow(environmental) # = 111
+environmental$grp = NULL # remove the grp variable we added previously
+fold_id = c(1, rep(1:10, each = 11))
+table(fold_id)
+```
+
+
+```{r}
+environmental$fold_id = sample(fold_id, replace = FALSE)
+head(environmental)
+```
+
+
+
+```{r}
+k = 10
+simple_mse = full_mse = vector(mode = "numeric", length = k)
+simple_mae = full_mae = vector(mode = "numeric", length = k)
+```
+
+
+```{r}
+res = data.frame(pred = NA, lozone = NA)
+for(i in 1:k) { 
+  
+  test_set = environmental[fold_id == i,]
+  training_set = environmental[fold_id != i,]
+  
+  simple_lm = lm(lozone ~ temperature, data = training_set)
+  simple_pred = predict(simple_lm, test_set)
+  
+  # what I tried to do in lectures almost worked except I mispelt pred as red:
+  res = rbind(res, cbind(pred = simple_pred , lozone = test_set$lozone))
+  
+  simple_mse[i] = mean((test_set$lozone - simple_pred)^2)
+  simple_mae[i] = mean(abs(test_set$lozone - simple_pred))
+  
+  full_lm = lm(lozone ~ radiation + temperature + wind, data = training_set)
+  full_pred = predict(full_lm, test_set)
+  full_mse[i] = mean((test_set$lozone - full_pred)^2)
+  full_mae[i] = mean(abs(test_set$lozone - full_pred))
+  
+}
+dim(res)
+# res # a data frame with the original y and the values that we predict from CV
+# https://stats.stackexchange.com/questions/230913/how-caret-calculates-r-squared
+cor(res, use = "pairwise.complete.obs")^2
+```
+
+
+```{r}
+simple_mse |> sqrt() |> round(2)
+```
+
+**Step 2**: estimate the model leaving one fold out, make predictions on the test set and calculate the error rate
+```{r}
+# box from lecture slides
+k = 10
+simple_mse = full_mse = vector(mode = "numeric", length = k)
+simple_mae = full_mae = vector(mode = "numeric", length = k)
+for(i in 1:k) { # go through each of the 10 folds
+  test_set = environmental[fold_id == i,] # only those test id's = i
+  training_set = environmental[fold_id != i,] # the other data points/rows
+  simple_lm = lm(lozone ~ temperature, data = training_set)
+  simple_pred = predict(simple_lm, test_set)
+  simple_mse[i] = mean((test_set$lozone - simple_pred)^2)
+  simple_mae[i] = mean(abs(test_set$lozone - simple_pred))
+  full_lm = lm(lozone ~ radiation + temperature + wind, data = training_set)
+  full_pred = predict(full_lm, test_set)
+  full_mse[i] = mean((test_set$lozone - full_pred)^2)
+  full_mae[i] = mean(abs(test_set$lozone - full_pred))
+}
+```
+we end up with 10 errors (since we have 10 folds)
+
+**Step 3**: aggregate the errors over the 10 folds
+```{r}
+cv_res = tibble(simple_mse, full_mse, 
+                simple_mae, full_mae)
+cv_res
+```
+```{r}
+# Find the averages:
+cv_sum_res = cv_res |> 
+  summarise(
+    across(.cols = everything(), 
+           mean)
+  )
+cv_sum_res |> t()
+```
+Common to report the root mean square errors (RMSE):
+```{r}
+sqrt(cv_sum_res[,1:2])
+```
+
+We could visualise the error rates for each of the 10 folds:
+```{r}
+cv_res |> gather(key = "metric", value = "error") |> 
+  separate(col = metric, into = c("model","metric")) |> 
+  ggplot(aes(x = model, y = error)) + facet_wrap(~metric, scales = "free_y") + 
+  geom_boxplot() 
+```
+
+
+## `caret` (Classification And REgression Training)
+
+
+simple model:  temperature
+full model: radiation + temperature + wind
+
+"tell me how to do it easily"
+
+```{r}
+# box from lecture slides
+library(caret) # works for all types of different prediction models
+
+cv_full = train(
+  lozone ~ radiation + temperature + wind, environmental,
+  method = "lm",
+  trControl = trainControl(
+    method = "cv", number = 10, # 10-fold cv
+    verboseIter = FALSE
+  )
+)
+cv_full
+```
+the Rsquared parameter is not a in-sample 
+
+This does the same as above, this is just a little simpler
+```{r}
+library(caret)
+tr_ctrl = trainControl(
+    method = "cv", 
+    number = 10,
+    verboseIter = FALSE
+  )
+
+cv_full = train(
+  lozone ~ radiation + temperature + wind, 
+  data =  environmental,
+  method = "lm",
+  trControl = tr_ctrl
+)
+cv_full
+```
+
+```{r}
+cv_simple = train(
+  lozone ~ temperature, 
+  environmental,
+  method = "lm",
+  trControl = tr_ctrl # the training method definded before
+)
+cv_simple
+```
+
+
+```{r}
+# take the train objects and visualise thier performance
+results <- caret::resamples(list(simple = cv_simple,  full = cv_full))
+
+ggplot(results, metric = "MAE") +
+  labs(y = "MAE") 
+
+ggplot(results, metric = "RMSE") +
+  labs(y = "RMSE")
+
+ggplot(results, metric = "Rsquared") +
+  labs(y = "Rsquared") 
+```
+Reuslt: 
+
+the full model performs better
+
+
+## Repeated CV
+
+
+```{r}
+library(caret)
+tr_ctrl = trainControl(
+    method = "repeatedcv", number = 10, repeats = 10,
+    verboseIter = FALSE
+  )
+cv_full = train(
+  lozone ~ radiation + temperature + wind, environmental,
+  method = "lm",
+  trControl = tr_ctrl
+)
+cv_full
+```
+
+```{r}
+cv_simple = train(
+  lozone ~ temperature, 
+  environmental,
+  method = "lm",
+  trControl = tr_ctrl
+)
+cv_simple
+```
+
+
+```{r}
+results <- caret::resamples(list(simple = cv_simple,  full = cv_full))
+ggplot(results, metric = "MAE") +
+  labs(y = "MAE")
+```
