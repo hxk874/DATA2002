@@ -4,26 +4,16 @@ output: html_document
 date: "2024-10-31"
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+1 if an individual is diabetic and 0 otherwise
+
+```{r}
+library(tidyverse)
+pima = readr::read_csv("https://raw.githubusercontent.com/DATA2002/data/master/pima.csv")
+glimpse(pima)
 ```
 
-## R Markdown
+1. Perform k-nearest neighbours on the data with k=5. 
+How does this perform in-sample? 
+How does this perform out-of-sample? 
+Don’t use the caret package, write your own CV method to implement 5-fold cross validation.
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
-```
-
-## Including Plots
-
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
-```
-
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.

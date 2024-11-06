@@ -1,0 +1,404 @@
+---
+title: "Week 13 Lab"
+date: "`r Sys.Date()`"
+author: "Tutor: Sanghyun Kim"
+output: 
+  html_document: 
+    ### IMPORTANT ###
+    # self_contained: true # Creates a single HTML file as output
+    code_folding: hide # Code folding; allows you to show/hide code chunks
+    ### USEFUL ###
+    code_download: true # Includes a menu to download the code file
+    ### OPTIONAL ###
+    df_print: paged # Sets how dataframes are automatically printed
+    theme: readable # Controls the font, colours, etc.
+    toc: true # (Useful) Creates a table of contents!
+    toc_float: true # table of contents at the side
+    number_sections: false # (Optional) Puts numbers next to heading/subheadings
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(message = FALSE, warning = FALSE)
+```
+
+```{r}
+library(tidyverse)
+```
+
+# Who has diabetes?
+
+```{r}
+pima = readr::read_csv("https://raw.githubusercontent.com/DATA2002/data/master/pima.csv")
+glimpse(pima)
+```
+
+## K-nearest neighbours
+
+![](knn.png)
+
+🙂 Pros
+
+- kNN is easy to understand and implement
+
+- Analytically tractable and simple implementation
+
+- Performance improves as the sample size grows
+
+- Uses local information, and is highly adaptive
+
+🙁 Cons
+
+- The distance metric only makes sense for quantitative variables (not categorical predictors).
+
+- Does not scale well and predictions can be slow: computationally intensive when predicting new observations, data is processed at that time, lazy algorithm.
+
+- Curse of dimensionality: doesn’t perform well with high dimensional inputs (i.e. with lots of predictors)
+
+- Easy to overfit/underfit: Small $k$ can overfit the data. High $k$ tend to “smooth out” the predictions, but if $k$ is too high then might underfit.
+
+### 1
+
+```{r}
+library(class)
+library(caret)
+library(cvTools)
+set.seed(1)
+# an alternative scaling function that could be used is:
+# norm_fn = function(x) { (x - min(x))/(max(x) - min(x)) }
+
+pima_scaled = pima %>% 
+  dplyr::mutate(
+    dplyr::across(c(bmi, bp, glu, serum, skin), # For any of these variables
+                  .fns = ~ dplyr::na_if(., 0)) # treat 0 values as NA
+  ) %>% 
+  drop_na() %>% # drop NA
+  mutate(y = factor(y)) %>% # convert y to binary data
+  mutate(across(where(is.numeric), .fns = scale)) # standardise all numeric variables
+
+X = pima_scaled %>% select(-y) # get a dataframe of predictors
+y = pima_scaled %>% select(y) %>% pull() # get a vector of the response variable (i.e., y)
+n = length(y) # number of observations
+
+knn5 = class::knn(train = X, test = X, cl = y, k = 5) # build a knn classifier with k = 5
+caret::confusionMatrix(knn5, y)$table # confusion matrix
+```
+
+```{r}
+caret::confusionMatrix(knn5, y)$overall[1]
+```
+
+Out of sample:
+
+```{r}
+K = 5  # number of CV folds
+cvSets = cvTools::cvFolds(n, K)  # permute all the data, into 5 folds
+glimpse(cvSets)
+```
+
+```{r}
+cv_acc = NA # initialise results vector
+
+for (j in 1:K) { # for each fold
+    test_id = cvSets$subsets[cvSets$which == j] # extract row indices for test data
+    X_test = X[test_id, ] # test predictors
+    X_train = X[-test_id, ] # training predictors
+    y_test = y[test_id] # test response
+    y_train = y[-test_id] # training response
+    fit = class::knn(train = X_train, test = X_test, cl = y_train, k = 5) # build a knn classifier (k = 5) with training data
+    cv_acc[j] = caret::confusionMatrix(fit, y_test)$overall[1] # evaluate the knn classifier on the test data and extract accuracy
+}
+mean(cv_acc) # average accuracy
+```
+
+The out of sample accuracy is 0.77, which is quite a bit lower than the in-sample accuracy of 0.84.
+
+### 2
+
+```{r}
+# range of k in knn to consider
+res = data.frame(k = 1:50, cv_rep_acc = NA) # initialise a dataframe of accuracy values for k = 1, 2, ..., 50
+
+for (i in res$k) { # for each k which represents number of nearest neighbours for the knn classifier
+    cvSets = cvTools::cvFolds(n, K)  # permute all the data, into 5 folds
+    cv_acc = NA  # initialise results vector
+    
+    for (j in 1:K) { # here k is the number of folds for cross-validation
+        test_id = cvSets$subsets[cvSets$which == j] # extract row indices for test data
+        X_test = X[test_id, ] # test predictors
+        X_train = X[-test_id, ] # training predictors
+        y_test = y[test_id] # test response
+        y_train = y[-test_id] # training response
+        fit = class::knn(train = X_train, test = X_test, cl = y_train, k = i) # train a knn classifier using a different number of nearest neighbours (k = i)
+        cv_acc[j] = caret::confusionMatrix(fit, y_test)$overall[1] # evaluate the knn classifier on the test data and extract accuracy
+    }
+    res$cv_rep_acc[i] = mean(cv_acc) # for each k = i (number of nearest neighbours), calculate CV-average accuracy and store in the res dataframe.
+}
+
+res %>%
+  ggplot() + 
+  aes(x = k, y = cv_rep_acc) + 
+  geom_point() + 
+  geom_line() +
+  geom_vline(xintercept = which.max(res$cv_rep_acc), colour = "red")
+```
+
+Looks like there’s a maximum around 30.
+
+### 3
+
+```{r}
+## 5-fold repeated CV with 10 repeats
+fitControl = trainControl(method = "repeatedcv", 
+                          number = 5,
+                          repeats = 10)
+knnFit1 = train(y ~ ., 
+                data = pima_scaled, # standardised dataframe
+                method = "knn", 
+                trControl = fitControl,
+                tuneLength = 10)
+knnFit1
+```
+
+```{r}
+knnFit1$results
+```
+
+```{r}
+knn_acc = max(knnFit1$results$Accuracy)
+```
+
+## Comparison
+
+### 4
+
+```{r}
+set.seed(2021)
+fitControl = trainControl(method = "repeatedcv", 
+                          number = 5, 
+                          repeats = 10)
+# decision tree
+rpartFit1 = train(y ~ ., data = pima_scaled, 
+                  method = "rpart", 
+                  trControl = fitControl)
+rpart_acc = max(rpartFit1$results$Accuracy)
+
+# random forests
+rfFit1 = train(y ~ ., data = pima_scaled,
+               method = "rf", 
+               trControl = fitControl) 
+rf_acc = max(rfFit1$results$Accuracy)
+
+# logistic regression, full model (no selection has been done)
+glmFit1 = train(y ~ ., data = pima_scaled, 
+                method = "glm", family = "binomial", 
+                trControl = fitControl)
+
+# logistic regression, stepwise model (see Lab 4b)
+glm_stepFit1 = train(y ~ npreg + glu + bmi + ped, 
+                     data = pima_scaled, 
+                     method = "glm", family = "binomial", 
+                     trControl = fitControl)
+glm_acc = glmFit1$results$Accuracy
+glm_step_acc = glm_stepFit1$results$Accuracy
+```
+
+Comparing the results
+
+```{r}
+knn_acc
+```
+
+```{r}
+rpart_acc
+```
+
+```{r}
+rf_acc
+```
+
+```{r}
+glm_acc
+```
+
+```{r}
+glm_step_acc
+```
+
+```{r}
+res = resamples(list(knn = knnFit1, 
+                     tree = rpartFit1, 
+                     forest = rfFit1,
+                     `logistic full` = glmFit1, 
+                     `logistic step` = glm_stepFit1))
+
+ggplot(res) + 
+  labs(y = "Accuracy")
+```
+
+A single decision tree performs worst, followed by knn. Logistic regression performed best (even better when some initial model selection was performed), closely followed by random forest.
+
+### 5
+
+The logistic regression and the random forest performed similarly well. I (Garth) have a preference towards interpretable and transparent models, and so given the similar performance, I would choose the logistic regression.
+
+### 6
+
+Not really. Our data only considered females at least 21 years old of Pima Indian heritage. If we were implementing it as a diagnostic tool, it’s only been validated against the similar individuals. In order to extend it more broadly we would need to assess its predictive power on different populations (i.e. people of other heritages).
+
+
+# Violent crime rates by states
+
+## Hierarchical clustering
+
+```{r}
+dplyr::glimpse(USArrests)
+```
+
+### 1
+
+```{r}
+us_arrest_dist = dist(scale(USArrests))
+```
+
+### 2
+
+```{r}
+us_arrest_hc = hclust(us_arrest_dist)
+plot(us_arrest_hc, hang = -1)
+```
+
+### 3
+
+```{r}
+# group into k = 4
+us_arrest_groups = cutree(us_arrest_hc, k = 4) # cut the tree such that we have 4 clusters
+
+us_arrest = USArrests %>%
+    tibble::rownames_to_column() %>%
+    mutate(hc4 = factor(us_arrest_groups)) # treat the classes as categorical data
+
+p1 = us_arrest %>%
+  ggplot() +
+  aes(x = UrbanPop, y = Murder, colour = hc4) +
+  geom_point() +
+  theme_bw() +
+  labs(title = "Hierarchical clusters")
+p1
+```
+
+## K-means
+
+```{r}
+us_arrests_kmeans = kmeans(scale(USArrests), centers = 4)
+
+us_arrest = us_arrest %>%
+    mutate(km4 = factor(us_arrests_kmeans$cluster))
+
+p2 = us_arrest %>%
+  ggplot() + 
+  aes(x = UrbanPop, y = Murder, colour = km4) + 
+  geom_point() +
+  theme_bw() + 
+  labs(title = "k-means clusters")
+
+gridExtra::grid.arrange(p1, p2, ncol = 2)
+```
+
+In this case, the k-means and the hierarchical clustering give very similar results when we ask for 4 clusters from both. Note that the group labelling is arbitrary in the colouring (above) or the group labelling below.
+
+```{r}
+us_arrest %>%
+  janitor::tabyl(hc4, km4)
+```
+
+# Who has diabetes? [Revisited]
+
+## Clustering and dimension reduction
+
+### 1
+
+```{r}
+km = kmeans(X, centers = 2, nstart = 10)
+tab = table(km$cluster, y)
+sum(diag(tab))/sum(tab)
+```
+
+Without knowing anything about the labels, the k-means looks like it has achieved an accuracy of 0.2602041. HOWEVER! we should compare this with the baseline accuracy where we just assign all observations to the largest group:
+
+```{r}
+tab = table(y)
+tab
+```
+
+```{r}
+max(tab)/sum(tab)
+```
+
+So if we just say all observations don’t have diabetes our accuracy is 65%, so k-means hasn’t done a particularly good job on differentiating by diabetes status, but that’s OK, we weren’t asking it to do that, we were just asking it to find two similar groups in the data.
+
+### 2
+
+🤔 What is PCA?
+
+👉 **One summary sentence of PCA**
+
+PCA reduces the dimension of data by creating **new** features (known as **Principal Components**) that *summarise* the original high-dimensional data using *all existing* variables in a way that those new features (1) maximise the variance in the original data and (2) are mutually uncorrelated.
+
+Also, see [the GOATED PCA post](https://stats.stackexchange.com/questions/2691/making-sense-of-principal-component-analysis-eigenvectors-eigenvalues) on CrossValidated.
+
+```{r}
+pca_pima = princomp(X) # perform PCA
+options(digits = 2)
+summary(pca_pima)
+```
+
+The first two principal components account for 51% of the variance in the data.
+
+```{r}
+# install.packages('remotes')
+# remotes::install_github('vqv/ggbiplot')
+library(ggbiplot)
+
+p1 = ggbiplot::ggscreeplot(pca_pima) + 
+  theme_bw(base_size = 16) +
+  labs(y = "Prop. of explained variance")
+
+p2 = ggbiplot::ggscreeplot(pca_pima, type = "cev") + 
+  theme_bw(base_size = 16) +
+  labs(y = " Cumulative prop. of explained variance")
+
+gridExtra::grid.arrange(p1, p2, ncol = 2)
+```
+
+### 3
+
+```{r}
+# biplot(pca_pima) # base graphics works just fine
+ggbiplot::ggbiplot(pca_pima, labels.size = 5, varname.size = 8, alpha = 0.2) +
+    theme_bw()
+```
+
+```{r}
+ggbiplot::ggbiplot(pca_pima, labels.size = 5, varname.size = 8, alpha = 0.25,
+                   groups = factor(km$cluster)) + # group data points by k-means clustering classes
+  theme_bw() + 
+  labs(title = "k-means clustering") +
+  scale_color_brewer(palette = "Set1") # color points differently according to k-means clustering classes
+```
+
+```{r}
+ggbiplot::ggbiplot(pca_pima, labels.size = 5, varname.size = 8, alpha = 0.25,
+                   groups = y) + 
+  theme_bw() + 
+  labs(title = "True classification") +
+  scale_color_brewer(palette = "Set1")
+```
+
+Using the `factoextra` package which plots the two clusters in the space spanned by the first two principal components:
+
+```{r}
+# install.packages('factoextra')
+library(factoextra)
+fviz_cluster(km, data = X, geom = "point") + theme_classic()
+```

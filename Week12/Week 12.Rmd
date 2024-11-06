@@ -1,0 +1,442 @@
+---
+title: "Week 12 Lab"
+date: "`r Sys.Date()`"
+author: "Tutor: Sanghyun Kim"
+output: 
+  html_document: 
+    ### IMPORTANT ###
+    # self_contained: true # Creates a single HTML file as output
+    code_folding: hide # Code folding; allows you to show/hide code chunks
+    ### USEFUL ###
+    code_download: true # Includes a menu to download the code file
+    ### OPTIONAL ###
+    df_print: paged # Sets how dataframes are automatically printed
+    theme: readable # Controls the font, colours, etc.
+    toc: true # (Useful) Creates a table of contents!
+    toc_float: true # table of contents at the side
+    number_sections: false # (Optional) Puts numbers next to heading/subheadings
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(message = FALSE, warning = FALSE)
+```
+
+```{r}
+library(tidyverse)
+theme_set(theme_bw())
+```
+
+# Who has diabetes?
+
+```{r}
+pima = readr::read_csv("https://raw.githubusercontent.com/DATA2002/data/master/pima.csv")
+glimpse(pima)
+```
+
+## EDA
+
+### 1
+
+```{r}
+GGally::ggpairs(pima, aes(alpha = 0.05))
+```
+
+Looks like there are some unwelcome zeros in the data. Let’s go variable by variable.
+
+```{r}
+p1 = pima |> ggplot(aes(x = npreg)) + geom_bar()
+p2 = pima |> ggplot(aes(x = age)) + geom_histogram()
+gridExtra::grid.arrange(p1,p2,ncol=2)
+```
+
+```{r}
+p2dat = pima |> dplyr::select(glu:ped) |> gather()
+ggplot(p2dat) + 
+  aes(x = value) + 
+  geom_histogram() + 
+  facet_wrap(~key, scales = "free")
+```
+
+The zeros in `bmi`, `bp`, `glu`, `serum` and `skin` don’t make sense. We could convert them to NA and drop them from the analysis:
+
+```{r}
+pima_clean = pima |> 
+  dplyr::mutate(
+    dplyr::across(c(bmi, bp, glu, serum, skin),
+                  .fns = ~ dplyr::na_if(., 0))
+  )
+```
+
+```{r}
+visdat::vis_miss(pima_clean) + 
+  theme(legend.position = "right")
+```
+
+```{r}
+pima_red = pima_clean |> drop_na()
+nrow(pima_red)
+```
+
+We can see that the serum variable is particularly troublesome with almost half of the observations missing. The `skin` variable also has a substantial proportion of missing values.
+
+If we drop any observations that have a missing value, this leaves us with only 392 from the original 768 data (around half of the observations had at least one missing value).
+
+Another alternative is to **impute** the missing values. A simple way to do this is to replace any `NA` values with the mean of that variable.
+
+```{r}
+pima_impute = pima |> 
+  mutate(
+    across(c(bmi, bp, glu, serum, skin),
+           .fns = ~ ifelse(. == 0, mean(., na.rm= TRUE), .))
+  )
+```
+
+If we proceeded with the `pima_impute` data, we would need to be cautious about reading too much into the results about the serum and skin variables.
+
+Equally, proceeding with the reduced data set might mean we’re excluding an important subset of people, those who don’t have access to medical facilities capable of taking insulin measurements.
+
+For now, let’s proceed with the imputed data set but we’ll remove the problematic `skin` and `serum` variables from consideration.
+
+```{r}
+pima_final = pima_impute |> 
+  dplyr::select(-serum, -skin) |> 
+  dplyr::mutate(y = factor(y))
+GGally::ggpairs(pima_final, aes(alpha = 0.05))
+```
+
+## Logistic regression
+
+🤔 Why & When do we use logistic regression?
+
+Not all data are numeric! - the response variable $y$ can be binary (e.g., `survival` or `death`).
+
+⚠️ However, linear regression is **NOT** suitable for modelling binary data!
+
+👉 Logistic regression to model binary data
+
+🤔 How does it work?
+
+Goal: we need to make binary $y$ **suitable for linear models**
+
+1. Model the binary $y$ using the **Bernoulli** random variable:
+
+$$Y_i|x_i \sim \text{Bernoulli}\left(\frac{\text{exp}(x_i^{'}\beta)}{1+\text{exp}(x_i^{'}\beta)}\right)$$
+
+2. Calculate **(logistic) probabilities** of binary outcomes:
+
+$$p(x_i,\beta) = \frac{\text{exp}(x_i^{'}\beta)}{1+\text{exp}(x_i^{'}\beta)}$$
+
+If this probability is greater than 0.5, we could make the prediction $\hat{Y}=1$, otherwise we'd predict $\hat{Y}=0$
+
+3. Since we don't know $\beta$, we need to estimate it (i.e., estimate model coefficients $\hat{\beta}$)
+
+⚠️ Note: computing logistic probabilities don't make data suitable for linear models!
+
+![](logistic_regression.png)
+
+👉 We need to convert the logistic probabilities to logit probabilities
+
+To do so:
+
+4. Compute odds using the logistic probabilities
+
+$$\text{Odds} = \frac{p(x_i,\beta)}{1-p(x_i,\beta)}$$
+
+5. Finally, log-transform the odds:
+
+$$\text{log}\left(\frac{p(x_i,\beta)}{1-p(x_i,\beta)}\right) = \text{logit}(p)$$
+
+This is known as a **logit** probability, which is suitable for linear models.
+
+Then the logistic regression model formula will look like this:
+
+$$\text{logit}(p_i) = \beta_0 + \beta_1 x_{1,i} + \beta_2 x_{2,i} + ... + \beta_p x_{p,i} + \epsilon_i$$
+
+Note that the above model is **linear** in coefficients (once we have $\text{logit}(p)$).
+
+### 2
+
+```{r}
+fm = glm(y ~ ., data = pima_final, family = binomial)
+step_model = step(fm, trace = FALSE)
+```
+
+```{r}
+modelsummary::modelsummary(list("Full model" = fm, "Stepwise model" = step_model),
+             estimate = "{estimate} ({std.error})",
+             statistic = "{p.value}")
+```
+
+### 3
+
+Number of times pregnant, glucose, BMI and diabetes pedigree function are all significantly positively associated with diabetes
+
+### 4
+
+```{r}
+library(equatiomatic)
+extract_eq(step_model, use_coefs = TRUE, coef_digits = 3, wrap = TRUE)
+```
+
+### 5
+
+We set up a data frame with the “new” data that we want to make predictions for. The new data frame needs to have variable names that match with the variables used in the model we’re trying to predict for. It’s OK to have extra variables in there, they just won’t be used. For example, in the data frame below we’ve included all the original predictors, but when we run `predict()` on `step_model` only the variables used in `step_model` will be used in the prediction and the others will be ignored (i.e. only `npreg`, `glu`, `bmi`, `ped` will be used).
+
+```{r}
+new_data = data.frame(age = c(35, 50), 
+                      npreg = c(2, 2), 
+                      bp = c(100, 100),
+                      bmi = c(30, 40), 
+                      glu = c(122, 122), 
+                      ped = c(1, 1))
+```
+
+Our predictions of the log-odds (also known as the **logit**) are:
+
+```{r}
+predict(step_model, new_data, type = "link")
+```
+
+And we can transform these to probability predictions using:
+
+```{r}
+predict(step_model, new_data, type = "response")
+```
+
+The standard approach to predicting the class outcome is to round these probabilities to zero or one:
+
+```{r}
+predict(step_model, new_data, type = "response") |> round()
+```
+
+### 6
+
+```{r}
+library(caret)
+preds = factor(round(predict(step_model, type = "response")))
+truth = pima_final$y
+confusionMatrix(data = preds, reference = truth, positive = "1")
+```
+
+The overall accuracy is 0.77.
+
+### 7
+
+Looking at the confusion matrix above we might want to reorder the rows and columns so that it matches with our contingency table from lecture 5 where we have the positive class (i.e. testing positive) in the first row and actually having the disease in the first column.
+
+```{r}
+res = data.frame(preds,truth)
+res |> 
+  mutate(preds = factor(preds, levels = c(1,0)),
+         truth = factor(truth, levels = c(1,0))) |> 
+  janitor::tabyl(truth, preds) |>
+  janitor::adorn_title(placement = "top")
+```
+
+Recall the sensitivity is $P(S^+|D^+)$, i.e. the probability of the test saying you test positive for diabetes, given that you actually have diabetes. From the confusion matrix we can estimate this by looking down the reference column with 1 as the header:
+
+$$\frac{150}{150+118} = 0.5597$$
+
+Recall the specificity is $P(S^-|D^-)$, i.e. the probability of the test saying you test negative for diabetes, given that you actually don’t have diabetes. From the confusion matrix, we can estimate this by looking down the reference column with 0 as the header:
+
+$$\frac{443}{443+57} = 0.886$$
+
+So our logistic regression diagnostic tool isn’t particularly sensitive nor very specific.
+
+### 8
+
+```{r}
+set.seed(2018)
+caret::train(y ~ npreg + glu + bmi + ped, 
+             data = pima_final,
+             method = "glm",
+             family = "binomial",
+             trControl = trainControl(method = "cv", number = 5))
+```
+
+## Random forest
+
+### 9
+
+```{r}
+library(rpart)
+library(rpart.plot)
+tree = rpart(y ~ ., data = pima_final)
+rpart.plot(tree, cex = 1.1)
+```
+
+```{r}
+library(partykit)
+plot(as.party(tree))
+```
+
+### 10
+
+```{r}
+predict(tree, new_data, type = "class")
+```
+
+### 11
+
+```{r}
+confusionMatrix(predict(tree, type = "class"), truth, positive = "1")
+```
+
+The in-sample accuracy is 0.83, a little better than the logistic regression in-sample accuracy of 0.77.
+
+### 12
+
+```{r}
+train(y ~ ., data = pima_final,
+      method = "rpart", 
+      trControl = trainControl(method = "cv", number = 5))
+```
+
+The tree with the highest out of sample accuracy has a complexity parameter of 0.017. This gave an out of sample accuracy of 0.74, which is a little worse than the logistic regression’s 0.77. It appears that the decision tree is over-fitting slightly which drags down its out of sample performance.
+
+### 13
+
+```{r}
+library(randomForest)
+set.seed(2018)
+rf = randomForest(y ~ ., data = pima_final)
+rf
+```
+
+The random forest has an out of bag error rate of 23.44% which corresponds to an out of bag accuracy of 76.56, a little better than the decision tree’s accuracy and comparable with the logistic regression model.
+
+
+## Comparison
+
+### Repeated CV
+
+The allocation of observations into CV folds is random, so there’s always the chance of getting a “strange” result just by chance. To get an even better understanding of the out of sample performance, it is common to run the cross validation process multiple times and average over the different CV runs. To do **repeated CV** in caret use `trainControl(method = "repeatedcv", number = 5, repeats = 10)` as the argument to the `trControl` parameter in the `train()` function. This means we want to perform 10 iterations of 5 fold CV (you can customise the `number` of folds and number of `repeats`).
+
+### 14
+
+```{r}
+trc = trainControl(method = "repeatedcv", 
+                   number = 5, 
+                   repeats = 10)
+# decision tree
+rpartFit1 = train(y ~ ., data = pima_final, 
+                  method = "rpart", trControl = trc)
+rpart_acc = max(rpartFit1$results$Accuracy)
+# random forests
+rfFit1 = train(y ~ ., data = pima_final,
+               method = "rf", trControl = trc) 
+rf_acc = max(rfFit1$results$Accuracy)
+# glm
+glmFit1 = train(y ~ ., data = pima_final, 
+                method = "glm", family = "binomial", 
+                trControl = trc) 
+glm_acc = glmFit1$results$Accuracy
+```
+
+Comparing the results
+
+```{r}
+rpart_acc
+```
+
+```{r}
+rf_acc
+```
+
+```{r}
+glm_acc
+```
+
+```{r}
+res = resamples(list(tree = rpartFit1,
+                     forest = rfFit1,
+                     logistic = glmFit1))
+ggplot(res) + labs(y = "Accuracy")
+```
+
+A single decision tree performs worst. Logistic regression performed best, closely followed by random forest.
+
+### 15
+
+The logistic regression and the random forest performed similarly well. I (Garth) have a preference towards interpretable and transparent models, and so given the similar performance, I would choose the logistic regression.
+
+### 16
+
+Not really. Our data only considered females at least 21 years old of Pima Indian heritage. If we were implementing it as a diagnostic tool, it’s only been validated against the similar individuals. In order to extend it more broadly we would need to assess its predictive power on different populations (i.e. people of other heritages).
+
+# Rock wallabies
+
+```{r}
+# install.packages("mplot")
+data("wallabies", package = "mplot")
+glimpse(wallabies)
+```
+
+## 2
+
+```{r}
+GGally::ggpairs(wallabies, 
+                mapping = aes(alpha = 0.2)) + 
+  theme_bw(base_size = 16)
+```
+
+## 2
+
+```{r}
+M1 = glm(rw ~ inedible + canopy + edible*distance + edible*shelter + distance*shelter, 
+         family = binomial, data = wallabies)
+summary(M1)
+```
+
+## 3
+
+```{r}
+M1_aic = step(M1)
+```
+
+```{r}
+sjPlot::tab_model(M1, M1_aic, show.ci = FALSE)
+```
+
+### 4
+
+```{r}
+library(equatiomatic)
+extract_eq(M1_aic, use_coefs = TRUE, coef_digits = 3)
+```
+
+### 5
+
+Shelter has the largest individual p-value (0.163) HOWEVER we wouldn’t drop the main effect for shelter when there is an interaction involving shelter still in the model. So if we were to drop a variable it would be the `edible*distance` interaction term as it has the largest p-value (0.136).
+
+### 6
+
+```{r}
+set.seed(2021)
+trc = trainControl(method = "repeatedcv", number = 10, repeats = 20)
+M1_caret = caret::train(factor(rw) ~ inedible + canopy + 
+                          edible*distance + edible*shelter + distance*shelter, 
+                        data = wallabies, method = "glm", 
+                        family = "binomial", trControl = trc)
+M1_step_caret = caret::train(factor(rw) ~ edible + distance + shelter +
+                               edible:distance + distance:shelter, 
+                             data = wallabies, method = "glm", 
+                             family = "binomial", trControl = trc)
+M1_simple = caret::train(factor(rw) ~ edible, 
+                         data = wallabies, method = "glm", 
+                         family = "binomial", trControl = trc)
+res = resamples(list(Full = M1_caret, Step = M1_step_caret, Simple = M1_simple))
+summary(res)
+```
+
+```{r}
+ggplot(res, metric = "Accuracy") + labs(y  ="Accuracy")
+```
+
+The simple model actually has the highest (out of sample) accuracy, though it should be noted that none of the models are very accurate. Note that the baseline accuracy rate is 58% and the accuracies from these models are not much higher than that.
+
+```{r}
+wallabies |> janitor::tabyl(rw)
+```
+

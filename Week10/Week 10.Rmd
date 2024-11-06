@@ -1,0 +1,489 @@
+---
+title: "Week 10 Lab"
+date: "`r Sys.Date()`"
+author: "Tutor: Sanghyun Kim"
+output: 
+  html_document: 
+    ### IMPORTANT ###
+    # self_contained: true # Creates a single HTML file as output
+    code_folding: hide # Code folding; allows you to show/hide code chunks
+    ### USEFUL ###
+    code_download: true # Includes a menu to download the code file
+    ### OPTIONAL ###
+    df_print: paged # Sets how dataframes are automatically printed
+    theme: readable # Controls the font, colours, etc.
+    toc: true # (Useful) Creates a table of contents!
+    toc_float: true # table of contents at the side
+    number_sections: false # (Optional) Puts numbers next to heading/subheadings
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(message = FALSE, warning = FALSE)
+```
+
+```{r}
+library(tidyverse)
+```
+
+# Lecture Recap
+
+## Two-way ANOVA with Blocks
+
+**Blocks**
+
+A block is a potential nuisance variable **whose effect on the response variable is not of interest to us**.
+
+👉 The effect of a block doesn't help us predict the level of the response variable.
+
+\
+
+🤔 Then why bother including blocks?
+
+However, blocking allows us <u> to remove some unexplained variation </u> to see the true treatment effect by reducing $RSS$.
+
+Recall the $F$-statistic is:
+
+$$F=\frac{\text{Treatment Mean Sq.}}{\text{Residual Mean Sq.}}$$
+
+Therefore, if blocking reduces $RSS$, $\text{Residual Mean Sq.}$ will also decrease, resulting in a **larger** $F$-statistic, and hence, a more significant p-value to reject $H_0$, holding degrees of freedom constant.
+
+\
+
+**Blocking Example**
+
+Imagine you're testing the effect of 4 different brands of fertilisers on crop yields on different **blocks** of land. Then the treatment effect (the fertilisers) may vary depending on where you test them (i.e. different blocks), which is not what we want to know, since we're only interested in the effect of the 4 different fertiliser brands.
+
+👉 Blocking allows us to see how much of the total variation in crop yields is attributable to blocks or to the fertilisers.
+
+# Lab Exercise
+
+## Poison and antidotes
+
+```{r}
+poison_data = read_csv("https://raw.githubusercontent.com/DATA2002/data/master/box_cox_survival.csv")
+poison_data = poison_data %>%
+    mutate(inv_survival = 1/y)  # create the reciprocal survival time variable
+glimpse(poison_data)
+```
+
+### 1
+
+```{r}
+poison_sum = poison_data %>% 
+  dplyr::group_by(poison, antidote) %>% # group data by the combination of poison and antidotes
+  dplyr::summarise(
+    mean = mean(inv_survival), # calculate the mean of the response
+    median = median(inv_survival), # calculate the median of the response
+    sd = sd(inv_survival), # calculate the sd of the response
+    iqr = IQR(inv_survival), # calculate the IQR of the response
+    n = n() # calculate the sample size
+  )
+
+poison_sum %>% knitr::kable(digits = 2)
+```
+
+### 2
+
+There are 4 observations in each treatment combination.
+
+### 3
+
+```{r}
+poison_data %>% 
+  ggplot() + 
+  aes(y = inv_survival, x = poison, colour = antidote) + 
+  geom_boxplot() + 
+  theme_bw() + 
+  facet_wrap(~ antidote, ncol = 4) + # the antidote data has 4 levels each of which has three poison levels (groups)
+  labs(y = "1/Survival", x = "Poison", colour = "Antidote")
+```
+
+### 4
+
+$$Y_{ijk} = \mu + \alpha_i + \gamma_j + (\alpha\gamma)_{ij} + \epsilon_{ijk}$$
+
+- $\mu$: overall mean
+- $\alpha_i$ and $\gamma_j$: treatment effects (differences between treatment group means and the overall mean)
+- $(\alpha\gamma)_{ij}$: interactions effects
+- $\epsilon_{ijk}\sim N(0, \sigma^2)$
+
+with the following constraints:
+
+- $\sum_{i}\alpha_i = 0$
+- $\sum_{j}\gamma_j = 0$
+- For each $j$, $\sum_{i}(\alpha\gamma)_{ij} = 0$
+- For each $i$, $\sum_{j}(\alpha\gamma)_{ij} = 0$
+
+### 5
+
+```{r}
+a1 = aov(inv_survival ~ poison*antidote, data = poison_data)
+summary(a1)  # could also use anova(a1)
+```
+
+### 6
+
+1. **Hypothesis**
+$$H_0:\ (\alpha\gamma)_{ij} = 0\ \text{for all}\ i=1,\ 2,\ 3,\ 4\ \text{and}\ j=1,\ 2,\ 3 \ \ \text{vs}\ \ H_1:\ \text{Not all}\ (\alpha\gamma)_{ij} = 0$$
+
+2. **Assumptions**
+
+- Normality (for residuals)
+- Homoskedasticity: a constant variance assumption
+
+3. **Test Statistic**
+
+$$T=\frac{\text{Mean Sq Interaction}}{\text{Mean sq Residual}}\sim F_{(a-1)(b-1),ab(n-1)}\ \ \text{under}\ H_0$$
+
+4. **Observed Test Statistic**
+
+$$t_0 = \frac{0.262}{0.240} = 1.09 \sim F_{6,36}\ \ \text{under}\ H_0$$
+
+5. **P-value**
+
+$$P(F_{6,36}\ge t_0) = P(F_{6,36}\ge 1.09) = 0.3867$$
+
+6. **Conclusion**
+
+|           Since the p-value is greater than 0.05, we don't reject $H_0$, indicating that the interaction effects are all 0.
+
+### 7
+
+Having found that the interaction term is not significant, we can proceed to consider whether or not there are any differences between the means of the main effects. I.e. we can look at the p-values associated with `poison` and `antidote.` [Note: we could also refit the model without the interaction term (drop the interaction term from the model), however, if when we were designing the experiment, we hypothesised that there should be an interaction, it's safer to leave it in and conduct inferences using the full model. By “safer”, I mean the model won't suffer from potential model misspecification.]
+
+Let $\alpha_1$, $\alpha_2$ and $\alpha_3$ be the treatment effects for the three levels of the poison variable (poisons I, II and III, respectively).
+
+1. **Hypothesis**
+$$H_0:\ \alpha_1 = \alpha_2 = \alpha_3 = 0 \ \ \text{vs}\ \ H_1:\ \text{Not all}\ \alpha_j = 0$$
+
+2. **Assumptions**
+
+- Normality (for residuals)
+- Homoskedasticity: a constant variance assumption
+
+3. **Test Statistic**
+
+$$T=\frac{\text{Mean Sq Poison}}{\text{Mean sq Residual}}\sim F_{(a-1),ab(n-1)}\ \ \text{under}\ H_0$$
+
+4. **Observed Test Statistic**
+
+$$t_0 = \frac{17.439}{0.240} = 72.64 \sim F_{2,36}\ \ \text{under}\ H_0$$
+
+5. **P-value**
+
+$$P(F_{2,36}\ge t_0) = P(F_{2,36}\ge 72.64) < 0.001$$
+
+6. **Conclusion**
+
+|           Since the p-value is less than 0.05, we reject $H_0$. There is strong evidence that the treatment effects are not all the same. I.e. there is a significant difference in the (reciprocal) survival time between the three poisons.
+
+### 8
+
+```{r}
+library(emmeans)
+emmip(a1, antidote ~ poison) +
+  theme_bw()
+```
+
+Since there are no intersections between lines this suggests that there's no interaction effect, as found above using the formal test.
+
+👉 You can see antidote A has the largest effect on the response at all levels of poison, and this holds for all other three levels of antidote. This means that the effect of one factor is the same at all levels of the other factor, and therefore, there's no interaction effect.
+
+### 9
+
+The ANOVA test assumes the residuals to follow a **normal distribution** with **constant variance**. We can check this using a scatter plot of the residuals against the fitted values (looking for **homoskedasticity**: constant error variance over the range of fitted values) and a normal quantile plot (looking to see that the points are close to the diagonal line).
+
+```{r}
+# using autoplot() from the ggfortify package
+library(ggfortify)
+autoplot(a1, which = 1:2) + 
+  theme_bw()
+```
+
+```{r}
+# manually extracting the fitted values and residuals
+poison_data = poison_data %>% 
+  mutate(
+    fitted = a1$fitted.values, # extract fitted values from the anova object
+    resid = a1$residuals # extract residuals from the anova object
+  )
+
+d1 = poison_data %>% 
+  ggplot() +
+  aes(x = fitted, y = resid) + # visualise fitted values against residuals
+  geom_point() + 
+  geom_hline(yintercept = 0, colour = "gray", lty = 2) + # draw a horizontal dotted line that represents 0 residual
+  theme_bw() + 
+  labs(title = "Residuals vs fitted", x = "Fitted values", y = "Residuals")
+
+d2 = poison_data %>% 
+  ggplot() +
+  aes(sample = resid) + # visualise residuals
+  geom_qq() + # draw dot points
+  geom_qq_line() + # draw the straight line
+  theme_bw() +
+  labs(title = "Normal QQ of the residuals", x = "Theoretical quantiles", y = "Residuals")
+
+gridExtra::grid.arrange(d1, d2, ncol = 2)
+```
+
+- **Residual plot**: It shows that the spread of residuals is roughly even above and below the central line and across the range of fitted values. Hence the equality of variance assumption is approximately satisfied.
+
+- **QQ Plot**: The points are all reasonably close to the diagonal line. Hence the normality assumption for residuals is approximately satisfied.
+
+
+## Manufacturing
+
+```{r}
+manufacturing = read_csv("https://raw.githubusercontent.com/DATA2002/data/master/manufacturing.csv")
+knitr::kable(manufacturing)
+```
+
+### 1
+
+```{r}
+manuf = gather(manufacturing, key = "machine", value = "output", A:D) %>% # create a new column called "machine" using the existing old columns A ~ D
+    mutate(day = factor(Day, levels = c("Mon", "Tue", "Wed", "Thu", "Fri")))
+glimpse(manuf)
+```
+
+### 2
+
+```{r}
+manuf %>%
+  ggplot() + 
+  aes(x = machine, y = output, colour = day) +
+  geom_point() +
+  theme_bw()
+```
+
+```{r}
+manuf %>%
+  ggplot() +
+  aes(x = day, y = output, colour = machine) +
+  geom_point() +
+  theme_bw()
+```
+
+```{r}
+manuf %>%
+  group_by(day) %>% # group data by day and for each day (group),
+  dplyr::summarise(mean = mean(output), # calculate the mean output level
+                   median = median(output), # calculate the median output level
+                   sd = sd(output), # calculate the sd of output level
+                   n = n()) %>% # calculate the number of observations
+    knitr::kable(digits = 2)
+```
+
+Monday and Friday seem to be lower output days.
+
+```{r}
+# similarly for each machine level (group)
+manuf %>%
+  group_by(machine) %>%
+  dplyr::summarise(mean = mean(output),
+                   median = median(output),
+                   sd = sd(output), 
+                   n = n()) %>%
+  knitr::kable(digits = 2)
+```
+
+Machine A seems to be outputting less than the other three machines.
+
+### 3
+
+The common sample (block) size is $n = 5$ (5 days per machine).
+
+### 4
+
+$$Y_{ij} = \mu + \alpha_i + \beta_j + \epsilon_{ij}$$
+
+- $\mu$: overall mean
+- $\alpha_i$: the treatment effect for machine $i=1,2,3,4$
+- $\beta_j$: the block effect for day $j=1,2,3,4,5$
+- $\epsilon_{ij}\sim N(0, \sigma^2)$
+
+with the following constraints:
+
+- $\sum_{i}\alpha_i = 0$
+- $\sum_{j}\gamma_j = 0$
+
+### 5
+
+```{r}
+manuf_aov = aov(output ~ day + machine, data = manuf)
+summary(manuf_aov)
+```
+
+Let $\alpha_1$, $\alpha_2$, $\alpha_3$ and $\alpha_4$ be the treatment effects for the 4 machines A, B, C and D, respectively.
+
+1. **Hypothesis**
+$$H_0:\ \alpha_1 = \alpha_2 = \alpha_3 = \alpha_4 = 0 \ \ \text{vs}\ \ H_1:\ \text{Not all}\ \alpha_j = 0$$
+
+2. **Assumptions**
+
+- Normality (for residuals)
+- Homoskedasticity: a constant variance assumption
+
+3. **Test Statistic**
+
+$$T=\frac{\text{Mean Sq Machine}}{\text{Mean sq Residual}}\sim F_{(a-1),(a-1)(b-1)}\ \ \text{under}\ H_0$$
+
+4. **Observed Test Statistic**
+
+$$t_0 = \frac{4482}{219} = 20.478 \sim F_{3,12}\ \ \text{under}\ H_0$$
+
+5. **P-value**
+
+$$P(F_{3,12}\ge t_0) = P(F_{3,12}\ge 20.478) < 0.001$$
+
+6. **Conclusion**
+
+|           Since the p-value is less than 0.05, we reject $H_0$. There is strong evidence that the treatment effects are not all the same. I.e. there is a significant difference between the mean outputs of the four difference machines.
+
+\
+
+**What if we don't include the block (day)?**
+
+```{r}
+# without the block variable
+one_aov = aov(output ~ machine, data = manuf)
+summary(one_aov)
+```
+
+Without blocking, both RSS and RMS increase (4772 and 298, respectively), and therefore, we can see blocking reduces RSS and RMS. As a result, the $F$-statistic increases from 15.03 to 20.478 by including the block.
+
+### 6
+
+```{r}
+autoplot(manuf_aov, which = 1:2) + theme_bw()
+```
+
+There is no apparent pattern in the residual vs fitted values plot, hence the common variance assumption is OK. Similarly, the points in the normal QQ plot are all reasonably close to the diagonal line, which suggests that the normality assumption is at least approximately satisfied.
+
+### 7
+
+```{r}
+em_machine = emmeans(manuf_aov, ~machine)
+contrast(em_machine, method = "pairwise", adjust = "tukey")
+```
+
+```{r}
+contrast(em_machine, method = "pairwise", adjust = "tukey") %>%
+  plot() +
+  geom_vline(xintercept = 0, color = "red") +
+  theme_bw()
+```
+
+We see that machine A is significantly different to the other machines (which in turn are not significantly different to each other).
+
+**Comment**: this is a block design, so we're not really interested in considering if day is significant - looking at the p-value for day, it isn't significant, but it has still played an important role in reducing the residual mean square and hence improved the sensitivity of the tests for differences among machines.
+
+
+## Hubble
+
+```{r}
+hubble = read_tsv("https://raw.githubusercontent.com/DATA2002/data/master/Hubble.txt")
+glimpse(hubble)
+```
+
+### 1
+
+```{r}
+hubble_scatter = hubble %>% 
+  ggplot() +
+  aes(x = distance, y = recession_velocity) +
+  geom_point() +
+  theme_bw()
+
+## Adding a regression line 
+hubble_lm = hubble_scatter +
+  geom_smooth(method = "lm", se = FALSE)
+
+## Adding a different line with intercept being zero
+hubble_lm2 = hubble_lm +
+  geom_smooth(method = 'lm',
+              formula = y ~ -1 + x,
+              col="red",
+              se = FALSE)
+
+gridExtra::grid.arrange(hubble_lm, hubble_lm2, ncol=2)
+```
+
+### 2
+
+```{r}
+hfit1 = lm(recession_velocity ~ distance, data = hubble)
+summary(hfit1)
+```
+
+Let the population model be:
+
+$$\text{Recession velocity}\ = \beta_0 + \beta_1\text{Distance} + \epsilon$$
+
+we want to test if $\beta_0 = 0$
+
+1. **Hypothesis**
+$$H_0:\ \beta_0 = 0 \ \ \text{vs}\ \ H_1:\ \beta_0 \ne 0$$
+
+2. **Assumptions**
+
+- Normality (for residuals): $\epsilon_i$ are i.i.d $N(0, \sigma^2)$
+- Linear relationship between $y$ and $x$
+
+3. **Test Statistic**
+
+$$T=\frac{\hat{\beta}_0}{\text{SE}(\hat{\beta}_0)}\sim t_{n-2}\ \ \text{under}\ H_0$$
+
+4. **Observed Test Statistic**
+
+$$t_0 = -0.489$$
+
+5. **P-value**
+
+$$2P(t_{n-2}\ge |t_0|) = 2P(t_{n-2}\ge 0.489) = 0.63$$
+
+6. **Conclusion**
+
+|           Since the p-value is greater than 0.05, we don't reject $H_0$, indicating that the intercept is not significantly different to zero.
+
+We can fit the model forcing the intercept to be exactly 0 (i.e. don't allow for an intercept in the model). We're only doing this because it is dictated by the underlying physics that the model is trying to describe - in general you wouldn't be checking for the significance of the intercept, you'd just leave it in the model regardless.
+
+```{r}
+hfit2 = lm(recession_velocity ~ -1 + distance, data = hubble)
+summary(hfit2)
+```
+
+We can compare the two models nicely using the `stargazer` package or the `sjPlot` package.
+
+Using the `stargazer` package:
+
+```{r}
+library(stargazer)
+stargazer(hfit1, hfit2, type = "text")
+```
+
+Using the `sjPlot` package:
+
+```{r}
+library(sjPlot)
+tab_model(hfit1, hfit2, show.ci = FALSE)
+```
+
+Note that it looks like the $R^2$ is higher for the model without an intercept, but the reported $R^2$ value is calculated differently for models where an intercept is not allowed, and it cannot be compared to models which do allow an intercept. See [here](https://stats.stackexchange.com/questions/26176/removal-of-statistically-significant-intercept-term-increases-r2-in-linear-mo) for some discussion around this. In general forcing your estimated regression model to pass through the origin is not a good idea.
+
+### 3
+
+```{r}
+autoplot(hfit1, which = 1:2) + theme_bw()
+```
+
+In the residual vs fitted values plot, there is no obvious pattern in the spread of the residuals across the range of fitted values. It looks like the homoskedasticity assumption is satisfied as the points are roughly equally spread over the range of fitted values.
+
+In the normal QQ plot, the points are all quite close to the diagonal line, suggesting that the normality assumption is comfortably satisfied.
+
+### 4
+
+Hubble started off being way off (around 500), and successive experiments over the years brought the estimate down as they got better at measuring things. https://en.wikipedia.org/wiki/Hubble%27s_law
+

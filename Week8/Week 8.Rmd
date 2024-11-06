@@ -1,0 +1,461 @@
+---
+title: "Week 8 Lab"
+date: "`r Sys.Date()`"
+author: "Tutor: Sanghyun Kim"
+output: 
+  html_document: 
+    ### IMPORTANT ###
+    # self_contained: true # Creates a single HTML file as output
+    code_folding: hide # Code folding; allows you to show/hide code chunks
+    ### USEFUL ###
+    code_download: true # Includes a menu to download the code file
+    ### OPTIONAL ###
+    df_print: paged # Sets how dataframes are automatically printed
+    theme: readable # Controls the font, colours, etc.
+    toc: true # (Useful) Creates a table of contents!
+    toc_float: true # table of contents at the side
+    number_sections: false # (Optional) Puts numbers next to heading/subheadings
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(message = FALSE, warning = FALSE)
+```
+
+```{r}
+library(tidyverse)
+```
+
+# Group work
+
+|    |  **DF**  |  **Sum Sq**  |  **Mean Sq**  |  **F value**  |  **Pr(>F)**  |
+|:----:|:----:|:----:|:----:|:----:|:----:|:----:|
+| Brand | 2 | 238.1 | 119.05 | 2.592 | 0.093 |
+| Residuals | 28 | 1286 | 45.93 |  |  |
+| Total | 30 | 1524.1 |  |  |  |
+
+```{r}
+# p-value
+pf(2.592, 2, 28, lower.tail = FALSE)
+```
+
+# Lecture Recap
+
+## ANOVA
+
+When we want to compare two population means, we can perform a two-sample $t$-test.
+
+🤔 What if we have more than 2 independent groups?
+
+👉 **ANOVA**: a generalisation of the two-sided two-sample $t$-test.
+
+### ANOVA Decomposition
+
+Decompose the total variation in the response variable $Y$ (**Total Sum of Squares**) into two parts:
+
+\begin{align*}
+\sum_{i=1}^g\sum_{j=1}^{n_i} (y_{ij}- \bar y_{\bullet\bullet})^2
+&=\underbrace{\sum_{i=1}^g\underbrace{\sum_{j=1}^{n_i} (y_{ij}-\bar y_{i\bullet})^2}_{=(n_i-1)s_i^2}}_{\text{sample variances}}
++
+\underbrace{\sum_{i=1}^g n_i (\bar y_{i\bullet}-\bar y_{\bullet\bullet})^{2}}_{\text{sample means}} \\
+& = \text{Residual SS} + \text{Treatment SS}
+\end{align*}
+
+![](ANOVA Decomposition.png)
+
+⚠️ **Intuition**
+
+Don't be scared by the math!
+\
+Put simply, we're just decomposing the total variation in Y (measurement) into **two sources of variation: Treatment vs Residuals**
+\
+- **Treatment SS** measures between-group variation (between different treatment levels): **Treatment effect**
+\
+- **Residual SS** measures within-group variation (within each treatment level): **Non-treatment effect**
+
+Then if we compute the ratio of these two sources of variation, we can see **if the treatment has an important effect on the response variable $Y$** (after normalising them by degrees of freedom, which account for the number of groups and sample size)
+\
+👉 The $F$ statistic
+
+\
+
+### The $F$ statistic
+
+\begin{align*}
+F=\frac{\text{Treatment Mean Square}}{\text{Residual Mean Square}} &= 
+\frac{\sum_{i=1}^gn_i(\bar Y_{i\bullet}-\bar Y_{\bullet\bullet})^2/(g-1)}{\sum_{i=1}^g\sum_{j=1}^{n_i}(Y_{ij}-\bar Y_{i\bullet})^2/(N-g)}\\
+& \sim \frac{\chi^2_{g-1}/(g-1)}{\chi^2_{N-g}/(N-g)} \ \text{ (both independent)}\\
+& \sim F_{g-1,N-g} \ \text{ under }H_0.
+\end{align*}
+
+👉 Large $F$ statistic means that $\text{Treatment Mean Squares} \gg \text{Residual Mean Squares}$
+\
+👉 **The treatment effect on the variation in Y is large** relative to within-group (within each treatment level) variation.
+\
+👉 In other words, $H_0:\mu_1=\mu_2=\ ...\ =\mu_g$ (no difference in group means between different treatment levels) is likely to be false!
+
+\
+
+### One-way ANOVA
+
+1. **Hypotheses**
+$$H_0:\mu_1=\mu_2=\ ...\ =\mu_g\ \ \text{vs}\ \ H_1: \text{at least one}\ \mu_i\ne\mu_j$$
+
+2. **Assumptions**
+
+- Observations are independent within each of the $g$ samples
+- Each of the $g$ populations have the same variance: $\sigma^2_1 = \sigma^2_2=\ ...\ =\sigma^2_g = \sigma$
+- Each of the $g$ populations are normally distributed
+
+3. **Test Statistic**
+
+$$T=\frac{\text{Treatment Mean Square}}{\text{Residual Mean Square}}\sim F_{g-1,N-g} \ \ \text{under}\ H_0$$
+
+4. **Observed Test Statistic**
+
+$$t_0 = \frac{\text{Observed Treatment Mean Square}}{\text{Observed Residual Mean Square}}$$
+
+5. **P-value**
+
+$$P(T\ge t_0) = P(F_{g-1,N-g}\ge t_0)$$
+
+6. **Decision**
+
+|           Reject $H_0$ if $p<\alpha$  
+
+\
+\
+
+# Lab Exercise
+
+## Critical Flicker Frequency
+
+```{r}
+flicker = read_tsv("https://raw.githubusercontent.com/DATA2002/data/master/flicker.txt")
+glimpse(flicker)
+```
+
+### a
+
+```{r}
+flicker %>% 
+  ggplot() +
+  aes(x = Colour, y = Flicker) +
+  geom_boxplot() + 
+  theme_classic()
+```
+
+```{r}
+flicker %>% 
+  ggplot() +
+  aes(sample = Flicker) +
+  geom_qq() +
+  geom_qq_line() +
+  facet_wrap(~Colour) + 
+  theme_classic()
+```
+
+The QQ-plots look OK, in that the points are reasonably close to the line. The box plots look symmetric, there are no outliers and they have similar spread. We can conclude that each population looks approximately normal and the equal variance assumption is reasonable.
+
+### b
+
+```{r}
+flicker_anova = aov(Flicker ~ Colour, data = flicker)
+flicker_anova
+summary(flicker_anova)
+pf(4.802, 2, 16, lower.tail = FALSE)
+```
+
+### c
+
+1. **Hypotheses**
+$$H_0:\mu_1=\mu_2=\mu_3\ \ \text{vs}\ \ H_1: \text{at least one}\ \mu_i\ne\mu_j$$
+
+2. **Assumptions**
+
+- Observations are independent within each of the 3 samples
+- Each of the 3 populations have the same variance: $\sigma^2_1 = \sigma^2_2=\sigma^2_3 = \sigma$
+- Each of the 3 populations are normally distributed
+
+3. **Test Statistic**
+
+$$T=\frac{\text{Treatment Mean Square}}{\text{Residual Mean Square}}\sim F_{g-1,N-g} \ \ \text{under}\ H_0$$
+
+4. **Observed Test Statistic**
+
+$$t_0 = \frac{22.997/2}{38.310/16}=\frac{11.499}{2.394}=4.8$$
+
+5. **P-value**
+
+$$P(T\ge t_0) = P(F_{2,16}\ge t_0)=0.023$$
+
+6. **Decision**
+
+|           As the p-value is less than 0.05 we reject the null hypothesis and conclude that the population mean flicker sensitivity of at least one eye colour is significantly different to the others.
+
+
+## Blonds
+
+```{r}
+pain = read_tsv("https://raw.githubusercontent.com/DATA2002/data/master/blonds.txt")
+glimpse(pain)
+```
+
+### 1
+
+```{r}
+pain = pain %>%
+    mutate(HairColour = factor(HairColour, 
+                               levels = c("LightBlond", "DarkBlond", "LightBrunette", "DarkBrunette")))
+levels(pain$HairColour)
+```
+
+### 2
+
+```{r}
+pain %>% 
+  ggplot() +
+  aes(x = HairColour, y = Pain) +
+  geom_boxplot() +
+  theme_classic()
+```
+
+```{r}
+pain %>% 
+  ggplot() +
+  aes(sample = Pain) +
+  geom_qq() +
+  geom_qq_line() + 
+  facet_wrap(~HairColour) +
+  theme_classic()
+```
+
+It is hard to say anything conclusive about the ANOVA assumptions with so few observations in the different groups. Should be careful not to read too much into boxplots with so few observations, but the spreads look roughly similar. Also with the QQ-plots, can’t be too conclusive because of the low sample size, but the points are all reasonably close to the lines so the normality assumption doesn’t appear to be violated.
+
+### 3
+
+A shocking apparent effect! Looks like as hair colour darkens, pain thresholds decrease.
+
+```{r}
+pain_anova = aov(Pain ~ HairColour, data = pain)
+summary(pain_anova)
+```
+
+1. **Hypotheses**
+$$H_0:\mu_1=\mu_2=\mu_3=\mu_4\ \ \text{vs}\ \ H_1: \text{at least one}\ \mu_i\ne\mu_j$$
+
+2. **Assumptions**
+
+- Observations are independent within each of the 3 samples
+- Each of the 3 populations have the same variance: $\sigma^2_1=\sigma^2_2=\sigma^2_3=\sigma^2_4=\sigma$
+- Each of the 3 populations are normally distributed
+
+3. **Test Statistic**
+
+$$T=\frac{\text{Treatment Mean Square}}{\text{Residual Mean Square}}\sim F_{g-1,N-g} \ \ \text{under}\ H_0$$
+
+4. **Observed Test Statistic**
+
+$$t_0 = \frac{453.6}{66.8}=6.791$$
+
+5. **P-value**
+
+$$P(T\ge t_0) = P(F_{3,15}\ge t_0)=0.004$$
+
+6. **Decision**
+
+|           As the p-value is less than 0.05 we reject the null hypothesis and conclude that the population mean pain threshold of at least one hair colour group is significantly different to the others.
+
+\
+
+The code and results below will be introduced in more detail in future weeks, but it provides a more overall way of assessing these assumptions. It’s a similar idea, looking for roughly constant spread in the “residuals” across the range of “fitted values” and looking to check if the (standardised) residuals lie close to the dashed line in the normal QQ plot. In this case the spread of the residuals looks roughly similar across the range of fitted values (indicating the equal variance assumption is OK) and the points all lie reasonably close to the dashed line in the QQ plot indicating that the normality assumption is well satisfied.
+
+```{r}
+library(ggfortify)
+autoplot(pain_anova, which = c(1, 2))
+```
+
+## Lecture recap
+
+## Multiple Testing
+
+|      |  **True $H_0$ ($\theta=0$)**  |  **False $H_0$ (\theta\ne0)**  | **Number of Tests** |
+|:----:|:----:|:----:|:----:|
+| **Conclusion $\theta=0$** | $U$ | $T$ | $m-R$ |
+| **Conclusion $\theta\ne0$** | $V$ | $S$ | $R$ |
+| **Number of Tests** | $m_0$ | $m-m_0$ | $m$ |
+
+⚠️ When performing $m$ number of (independent) hypothesis tests, **the total number of false positives (falsely rejecting true $H_0$) will be $m\times\alpha$**, since $\alpha$ is a probability making false positives when performing a single hypothesis test.
+
+The goal of the following two correction methods is **to reduce the total number of false positives when we perform multiple hypothesis tests**
+
+### Bonferroni Correction
+
+👉 Controls **the probability of making at least one or more false positives** (FWER) at level $\alpha$.
+\
+In other words, $P(V\ge1)<\alpha$.
+
+🧐 How?
+
+1. In each of the $m$ tests, calculate the p-value as usual
+
+2. Set a **new threshold** $\alpha\ast=\frac{\alpha}{m}$
+
+3. For each test, reject $H_0$ **if the p-value is less than the new threshold $\alpha\ast$**. That is, reject $H_0$ if $p<\frac{\alpha}{m}$
+
+⚠️ Alternative way
+
+1. In each of the $m$ tests, adjust the p-value: $p\ast=p\times m$
+
+2. Reject $H_0$, if the adjusted p-value is less than *original* $\alpha$. That is, reject $H_0$ if $p*<\alpha$
+
+※ Note making $\alpha$ smaller ($\alpha*=\alpha/m$) and compare this adjusted $\alpha\ast$ with the unadjusted p-value is the same as making the individual p-value larger ($p*=p\times m$) and compare this adjusted p-value with unadjusted $\alpha$, since $p<\frac{\alpha}{m}$ is the same as $p\times m < \alpha$
+
+**Pros and Cons**
+
+⭕️ Pros: easy to calculate the adjusted significance level $\alpha\ast$
+
+❌ Cons: **very conservative**!
+
+👉 When $m$ gets significantly large (e.g. $m=1,000,000$), $\alpha\ast = \frac{\alpha}{m}$ **becomes extremely small**.
+\
+👉 With this extremely small $\alpha\ast$, **we'll almost always never reject any $H_0$** regardless of whether it's true or not.
+\
+👉 Chances of not rejecting false $H_0$ ↑ (i.e., Type 2 error ↑)
+
+\
+
+### Benjamini-Hochberg Correction
+
+👉 Controls the **false discovery rate (FDR) - expected proportion of false positives**: $E\left(\frac{V}{R}\right)$ by keeping FDR close to $\alpha$.
+
+🧐 How?
+
+1. In each of the $m$ tests, calculate the p-value as usual
+
+2. Order p-values from smallest to largest: $p_{(1)}\le p_{(2)}\le\ ...\ \le p_{(m)}$
+
+3. Find $j\ast=\text{max}\ j$ such that $p_{(j)}\le \frac{j}{m}\alpha$
+\
+👉 In other words, we order $m$ individual p-values and then find **a cutoff p-value $p_{(j)}$ that keeps the proportion of false positives (FDR) close to $\alpha$**
+\
+Note that **we're making $\alpha$ smaller again** by scaling $\alpha$ by $\frac{j}{m}$ because the maximum possible value for $\frac{j}{m}$ is 1, as we have $m$ p-values.
+
+4. For each test, reject $H_{0i}$ if $p_{(i)}\le\frac{j\ast}{m}\alpha$
+
+**Pros and Cons**
+
+⭕️ Pros: less conservative than the Bonferroni correction
+
+❌ Cons: because it's less conservative, it allows for more false positives
+
+## Hedenfalk data
+
+### a
+
+```{r}
+# install.packages('sgof')
+library(sgof)
+glimpse(Hedenfalk)
+?Hedenfalk # the column x represents unadjusted p-values
+```
+
+```{r}
+# total number of p-values = total number of hypothesis tests
+length(Hedenfalk$x)
+```
+
+### b
+
+```{r}
+# distribution of unadjusted p-values: x
+Hedenfalk %>% 
+  ggplot() +
+  aes(x = x) +
+  geom_histogram()
+```
+
+```{r}
+# A slightly improved histogram, where the bins don’t go below 0 or above 1:
+Hedenfalk %>% 
+  ggplot() +
+  aes(x = x) +
+  geom_histogram(boundary = 0, binwidth = 0.05) + # set the boundary to 0 and adjust the width of bins to make the histogram above look nicer
+  labs(x = "Unadjusted p-value", y = "Count") + 
+  theme_bw()
+```
+
+### c
+
+```{r}
+# the total number of rejected H_0 out of the 3170 hypothesis tests
+sum(Hedenfalk$x < 0.05)
+```
+
+```{r}
+# the proportion of rejected H_0 out of the 3170 hypothesis tests
+mean(Hedenfalk$x < 0.05)
+```
+
+### d
+
+With so many tests, it’s likely we’re seeing a substantial number of false positives. With 3170 p-values, even if none of them should be rejected (i.e. even if in reality the null hypothesis is true for all tests), we’d expect to see $3170\times0.05=158.5$ significant p-values by chance alone.
+
+### e
+
+```{r}
+Hedenfalk = Hedenfalk %>%
+  mutate(
+    bonf_p = p.adjust(x, method = "bonferroni"), # Bonferroni correction == p*m
+    BH_p = p.adjust(x, method = "BH") # Benjamini-Hochberg correction
+  )
+
+p1 = Hedenfalk %>% # distribution of Bonferroni adjusted p-values
+  ggplot() + 
+  aes(x = bonf_p) + 
+  geom_histogram(boundary = 0, binwidth = 0.05) +
+  theme_bw() + 
+  labs(x = "Bonferroni adjusted p-value",
+       y = "Count") + 
+  scale_y_log10()
+
+p2 = Hedenfalk %>% # distribution of Benjamini-Hochberg adjusted p-values
+  ggplot() + 
+  aes(x = BH_p) + 
+  geom_histogram(boundary = 0, binwidth = 0.05) +
+  labs(x = "BH adjusted p-value",
+       y = "Count") + 
+  theme_bw()
+
+gridExtra::grid.arrange(p1, p2, ncol = 2) # combine the two graphs
+```
+
+```{r}
+# sum(Hedenfalk$bonf_p < 0.05) mean(Hedenfalk$bonf_p < 0.05)
+# sum(Hedenfalk$BH_p < 0.05) mean(Hedenfalk$BH_p < 0.05)
+Hedenfalk %>%
+    summarise_at(.vars = vars(bonf_p, BH_p), # for each of the two columns: bonf_p and BH_p
+                 .funs = list(n_sig = function(x) sum(x < 0.05), # find the number of Bonferroni/BH adjusted p-values less than unadjusted alpha = 0.05
+                              prop_sig = function(x) mean(x < 0.05))) %>% # find the proportion of Bonferroni/BH adjusted p-values less than unadjusted alpha = 0.05
+    knitr::kable()
+```
+
+### f
+
+The Bonferroni method seeks to control the family wise error rate, and can be very conservative. The Benjamini–Hochberg (BH) method looks to control the false discovery rate and tends to allow for more false positives. We can see this in the results, where the Bonferroni method finds only two significantly differentially expressed genes whereas the BH procedure identified 94.
+
+
+### Extra
+
+The following code will prove that we can adjust $\alpha$ and compare adjusted $\alpha\ast$ with unadjusted p-values for the Bonferroni correction method.
+
+```{r}
+Hedenfalk %>%
+    summarise_at(.vars = vars(x), # for unadjusted p-values x
+                 .funs = list(n_sig = function(x) sum(x < 0.05/3170), # find the number of unadjusted p-values (x) less than adjusted alpha (0.05/3170)
+                              prop_sig = function(x) mean(x < 0.05/3170))) %>% # find the proportion of unadjusted p-values (x) less than adjusted 0.05 (0.05/3170)
+    knitr::kable()
+```
+
+As you can see, the total number of false positives after the Bonferroni correction is the same as above (see `bonf_p_n_sig` and `bonf_p_prop_sig` in question e above).
+

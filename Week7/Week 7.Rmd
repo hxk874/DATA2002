@@ -1,0 +1,638 @@
+---
+title: "Week 7 Lab"
+date: "`r Sys.Date()`"
+author: "Tutor: Sanghyun Kim"
+output: 
+  html_document: 
+    ### IMPORTANT ###
+    # self_contained: true # Creates a single HTML file as output
+    code_folding: hide # Code folding; allows you to show/hide code chunks
+    ### USEFUL ###
+    code_download: true # Includes a menu to download the code file
+    ### OPTIONAL ###
+    df_print: paged # Sets how dataframes are automatically printed
+    theme: readable # Controls the font, colours, etc.
+    toc: true # (Useful) Creates a table of contents!
+    toc_float: true # table of contents at the side
+    number_sections: false # (Optional) Puts numbers next to heading/subheadings
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(message = FALSE, warning = FALSE)
+```
+
+```{r}
+library(tidyverse)
+```
+
+# Group work
+
+|  **Prices**  |  **1**  |  **2**  |  **3**  |  **4**  |  **5**  |  **6**  |
+|:----:|:----:|:----:|:----:|:----:|:----:|:----:|:----:|
+| 1 | 2.1 | 2.4 | 5.9 | 2.8 | 2.9 | 6.4 |
+| 2 | 3.4 | 1.4 | 1.9 | 2.2 | 5.0 | 3.3 |
+| 3 | 3.3 | 2.9 | 2.1 | 6.6 | 3.5 | 1.0 |
+| 4 | 3.9 | 2.1 | 1.6 | 2.4 | 1.6 | 1.9 |
+| 5 | 2.0 | 1.2 | 4.1 | 2.9 | 1.5 | 5.1 |
+| 6 | 3.4 | 2.3 | 4.3 | 4.2 | 4.1 | 3.8 |
+
+```{r}
+sample(1:6, 2, replace = TRUE)
+```
+
+## Question 1
+
+```{r}
+population = c(2.1, 2.4, 5.9, 2.8, 2.9, 6.4, 3.4, 1.4, 1.9, 2.2, 5, 3.3,
+               3.3, 2.9, 2.1, 6.6, 3.5, 1, 3.9, 2.1, 1.6, 2.4, 1.6, 1.9, 
+               2, 1.2, 4.1, 2.9, 1.5, 5.1, 3.4, 2.3, 4.3, 4.2, 4.1, 3.8)
+res = NULL
+set.seed(123)
+
+# construct 60 resampled data 
+for (i in 1:60) {
+    student_sample = sample(population, 6, replace = FALSE) # randomly sample house prices for 6 unique houses (replace = FALSE). Note this is not bootstrapping!
+    res[i] = mean(student_sample) # for each resampled data (randomly selected 6 house prices), compute the mean
+}
+```
+
+```{r}
+data.frame(average_prices = res) %>% 
+  ggplot() +
+  aes(x = average_prices) +
+  geom_histogram(binwidth = 0.5) + 
+  geom_vline(xintercept = 3.1, color = "red") + # the population mean
+  theme_classic()
+```
+
+We can see that the resampled mean house prices are centered around the population mean $3.1M.
+
+## Question 2
+
+```{r}
+set.seed(1234)
+my_sample = sample(population, 6, replace = FALSE) # choose your own sample data
+my_sample
+```
+
+```{r}
+bs_res = NULL
+
+# construct 200 bootstrap samples
+for(i in 1:200){
+  bs_sample = sample(my_sample, 6, replace = TRUE) # using your own sample data (my_sample), resample your own sample data with replacement == bootstrapping
+  bs_res[i] = mean(bs_sample) # for each resampled data, compute the average house price
+}
+```
+
+```{r}
+# 95% confidence interval for bootstrap sample means
+bs_ci = quantile(bs_res, c(0.025, 0.975))
+bs_ci
+```
+
+```{r}
+true_value = 3.1
+true_value > bs_ci[1] & true_value < bs_ci[2]
+```
+
+```{r}
+# the distribution of the 200 bootstrap sample means
+data.frame(average_prices = bs_res) %>% 
+  ggplot() + 
+  aes(x = average_prices) +
+  geom_histogram(binwidth = 0.5) + 
+  theme_classic()
+```
+
+# Lecture recap
+
+### Bootstrapping
+
+🤔 **Motivation**
+
+After we estimate parameters (e.g. sample mean) using the sample data, we construct 95% confidence intervals to account for inherent variability resulting from *estimation*. Such statistical inferences can only be made when we know the underlying distribution of population data.
+
+However, that's not always the case. What if we don't know the underlying distribution of population data?
+
+👉 Bootstrapping is a resampling method used to make statistical inferences **when there's no information about the underlying distribution of population data**.
+
+**Workflow**
+
+1. Randomly **resample sample data with replacement** lots of times
+2. For each bootstrap sample, compute bootstrap statistics (e.g. mean, median or MAD)
+3. Construct a 95% confidence interval for bootstrap statistics calculated in step 2
+
+⚠️ Note that the bootstrap distribution and original sample distribution are *different*. However, if a distribution assumption for a test is satisfied, *both distributions become similar*
+
+
+# Lab Questions
+
+## Speed of light
+
+```{r}
+speed_file = read_csv("https://raw.githubusercontent.com/DATA2002/data/master/speed_of_light.txt")
+speed = speed_file$Speed_of_Light
+
+speed_file %>% 
+  ggplot() +
+  aes(x="", y = Speed_of_Light) +
+  geom_boxplot(colour = "red", outlier.size = 4) + 
+  theme_classic(base_size = 16) + 
+  labs(x = "", y = "Speed") + 
+  coord_flip()
+```
+
+### a
+
+```{r}
+speedb1 = sample(speed, replace = TRUE) # sampling with replacement == bootstrapping
+boxplot(speed, speedb1, horizontal = TRUE, names = c("Original", "BS"))
+```
+
+```{r}
+## qqplot
+df = data.frame(original_sample = sort(speed), 
+                bootstrap_sample = sort(speedb1))
+df %>% 
+  ggplot() +
+  aes(x = original_sample, y = bootstrap_sample) +
+  geom_point() + 
+  geom_abline(slope = 1, intercept = 0) + 
+  theme_classic()
+```
+
+### b
+
+```{r}
+df %>%
+  summarise(across(.cols = everything(), # for every column (i.e., original_sample and bootstrap_sample)
+                   .fns = list(mean = mean, median = median))) %>% 
+  gt::gt() %>% 
+  gt::tab_spanner(label = "Original sample", columns = starts_with("original")) %>% 
+  gt::tab_spanner(label = "Bootstrap sample", columns = starts_with("bootstrap")) %>% 
+  gt::cols_label(ends_with("mean") ~ "Mean",
+                 ends_with("median") ~ "Median") %>% 
+  gt::fmt_number()
+```
+
+```{r}
+df %>% 
+  pivot_longer(cols = everything(), # pivot the dataframe (just to make it easy for us to visualise data)
+               names_to = "sample", # so that we have one column representing sampling type (original vs bootstrap)
+               values_to = "speed") %>% # and the other column representing the corresponding speed measurements (observations)
+  ggplot() + 
+  aes(y = sample, x = speed) +
+  geom_boxplot() + 
+  theme_classic()
+```
+
+### c
+
+```{r}
+B = 20 # construct 20 bootstrap samples
+speedbmean = numeric(B)
+
+for (i in 1:B) {
+    resampled_data = sample(speed, replace = TRUE) # sampling with replacement == bootstrapping
+    speedbmean[i] = mean(resampled_data) # for each bootstrap sample, calculate a bootstrap mean
+}
+speedbmean[1:10] # look at the first 10 bootstrap means
+```
+
+```{r}
+# bootstrap mean distribution
+hist(speedbmean)
+abline(v = mean(speed), col = "red", lwd = 2) # red line = the original sample mean
+```
+
+From above, we can see that the distribution of 20 bootstrap sample means are centered around the original sample mean.
+
+### d
+
+```{r}
+B = 1000 # construct 1000 bootstrap samples
+speedbmean2 = numeric(B)
+for (i in 1:B) {
+    resampled_data = sample(speed, replace = TRUE) # sampling with replacement == bootstrapping
+    speedbmean2[i] = mean(resampled_data) # for each bootstrap sample, calculate a bootstrap mean
+}
+
+hist(speedbmean2) # bootstrapping mean distribution
+abline(v = mean(speed), col = "red") # red line = the original sample mean
+```
+
+Once you get up around 1000, 5000, 10000, 100000, the shape of the histogram stays almost exactly the same, i.e. there’s not really any advantage to taking larger and larger bootstrap resamples.
+
+### e
+
+```{r}
+# 95% confidence interval for the bootstrapping mean
+quantile(speedbmean2, c(0.025, 0.975))
+```
+
+```{r}
+n = length(speed)
+# 95% confidence interval for the original sample data
+mean(speed) + qt(c(0.025, 0.975), n - 1) * sd(speed)/sqrt(n)
+```
+
+If we compare the bootstrap 95% confidence interval to the original 95% confidence interval, they're quite similar to each other.
+\
+A key takeaway is as we increase the number of bootstrap samples, the resulting bootstrap confidence interval will get closer to the original confidence interval. However, there's no point in having more bootstrapping samples at some point, as mentioned above.
+
+```{r}
+B = 10000
+speedbmed = speedbmad = numeric(B)
+for (i in 1:B) {
+    resampled_data = sample(speed, replace = TRUE)
+    speedbmed[i] = median(resampled_data) # instead of mean, calculate median
+    speedbmad[i] = mad(resampled_data) # instead of mean/median, calculate MAD
+}
+# the median distribution is quite discrete
+speedbmed[1:10]
+```
+
+```{r}
+plot(table(speedbmed))
+```
+
+```{r}
+# median distribution
+hist(speedbmed)
+abline(v = median(speed), col = "red")
+```
+
+```{r}
+# 95% confidence interval for bootstrapping median
+quantile(speedbmed, c(0.025, 0.975))
+```
+
+```{r}
+# the mad distribution is also quite discrete
+plot(table(speedbmad))
+```
+
+```{r}
+# MAD distribution
+hist(speedbmad)
+abline(v = mad(speed), col = "red")
+```
+
+```{r}
+# 95% confidence interval for bootstrapping MAD
+quantile(speedbmad, c(0.025, 0.975))
+```
+
+## Cotinine
+
+```{r}
+x = c(0, 87, 173, 253, 1, 103, 173, 265, 1, 112, 198, 266, 3, 121,
+      208, 277, 17, 123, 210, 284, 32, 130, 222, 289, 35, 131, 227,
+      290, 44, 149, 234, 313, 48, 164, 245, 477, 86, 167, 250, 491)
+```
+
+### 1
+
+```{r}
+summary(x)
+```
+
+```{r}
+par(mfrow = c(1, 2))
+hist(x)
+qqnorm(x)
+qqline(x)
+```
+
+While the mean and the median are similar, graphically there does appear to be some skewness with two quite large observations. There is some departure from the line in the normal QQ plot, particularly at the extremes, indicating the normality assumption may not be satisfied.
+
+### 2
+
+One may argue that perhaps the skewness is due to a few outlying observations - for example the cotinine levels of 477 and 491. However these may be the cotinine levels of regular heavy smokers. So it would not be impossible to obtain observations as extreme as these - the description of cotinine levels even suggests this. So we should not ignore them or remove them from the data.
+
+### 3
+
+```{r}
+t.test(x, mu = 130)
+```
+
+The p-value is 0.03, less than 0.05 therefore we reject the null hypothesis at the 5% level of significance and conclude that the true mean cotinine level is not equal to 130.
+
+### 4
+
+```{r}
+# remove any zero differences
+x1 = x[x != 130]
+bigger = x1 > 130
+table(bigger)
+```
+
+```{r}
+# visualising a binomial distribution since the sign test reduces to the binomial test
+# blue regions represent a p-value, since it's a two-sided test
+barplot(dbinom(0:39, 39, 0.5), 
+        names = 0:39, 
+        col = c(rep("blue", 16),
+                rep("white", 8), 
+                rep("blue", 15)))
+```
+
+```{r}
+2*(pbinom(15, 39, 0.5))
+2*(1 - pbinom(23, 39, 0.5))
+```
+
+```{r}
+binom.test(table(bigger))
+```
+
+Using the sign test we do not reject the null hypothesis at the 5% level of significance as the p-value is larger than 0.05.
+
+### Permutation test for paired/single sample data
+
+**Workflow**
+
+1. Compute differences between two measurements (paired sample) or differences between sample data and the null hypothesised mean (one sample)
+
+2. Randomly permute (resample) **the signs of differences with replacement** lots of times
+
+3. Assign these randomly permuted signs to the original differences
+
+4. For each resampled data with randomly permuted signs of differences, perform a one sample $t$-test to extract the test statistic
+
+5. Compute the proportion of test statistics, as or more extreme than the original test statistic 👉 a permutation test p-value
+
+
+🤔 What if there are outliers?
+
+👉 Wilcoxon signed-rank test (Think about why it's more robust than the $t$-test)
+
+### 4
+
+Remembering the importance of exchangeablility, we can’t just resample our observations with replacement (like in the bootstrap). Since this is a test of a mean, to make our randomisation p-value we need to randomly sample variation around the mean. We do this by randomly assigning a sign change to the differences between the data and the hypothesised mean. In this way, the (mean-adjusted) data stays the same except for a potential sign change which is what generates our null distribution.
+
+```{r}
+repetitions = 10000
+hyp_mean = 130
+n = length(x)
+```
+
+Under $H_0$, the data has a mean of 130. Re-centre the data by this. Under $H_0$, random re-labelling of the absolute values of the centred data should have a mean of zero.
+
+```{r}
+diff_data = x - hyp_mean # compute differences between the sample data and null hypothesised mean
+dbar = mean(diff_data) # the sample mean of differences
+rando_means = numeric(repetitions) # initialise an empty vector
+
+for (i in 1:repetitions){
+  permuted_signs = sample(c(-1, 1), n, replace = TRUE) # randomly permute the signs (+/-) == permutation t-test for one sample data
+  permuted_data = permuted_signs * diff_data # assign those randomly permuted signs to the original differences
+  rando_means[i] = mean(permuted_data) # for each permuted sample data, store the mean difference
+}
+
+# p-value = the proportion of permuted mean differences, as or more extreme than the original mean difference
+# note: it's a two-sided test, so we use the absolute mean difference to account for both tails
+pval = mean(abs(rando_means) >= abs(dbar))
+plot(density(rando_means))
+abline(v = dbar, col = "red") # positive original mean difference
+abline(v = -dbar, col = "red") # negative original mean difference
+```
+
+The permutation test p-value is 0.0307 which is less than 0.05 so we reject the null hypothesis.
+
+### 5
+
+Given there was a some question about the normality assumption (the extremes of the Q-Q plot weren’t perfectly on the line), the permutation test is the most reliable here, as it does not assume the observations are sampled from a normal population.
+
+However, in this case the $t$-test would also likely be fine as the departure from normality wasn’t very severe and sample size is just large enough for the central limit theorem to ensure approximately valid inferences.
+
+### 6
+
+```{r}
+B = 10000
+sd_boot = numeric(B)
+mad_boot = numeric(B)
+
+for (i in 1:B) {
+    boot_sample = sample(x, replace = TRUE) # sampling with replacement == bootstrapping
+    sd_boot[i] = sd(boot_sample) # for each bootstrap sample, calculate SD
+    mad_boot[i] = mad(boot_sample) # for each bootstrap sample, calculate MAD
+}
+
+# 95% confidence interval for bootstrap sd
+quantile(sd_boot, c(0.025, 0.975))
+```
+
+```{r}
+# 95% confidence interval for bootstrapping MAD
+quantile(mad_boot, c(0.025, 0.975))
+```
+
+```{r}
+# the length of the 95% confidence interval for bootstrapping SD
+# i.e. 97.5th percentile point -  2.5th percentile point
+diff(quantile(sd_boot, c(0.025, 0.975)))
+```
+
+```{r}
+# the length of the 95% confidence interval for bootstrapping MAD
+# i.e. 97.5th percentile point -  2.5th percentile point
+diff(quantile(mad_boot, c(0.025, 0.975)))
+```
+
+The length of the bootstrap confidence interval for the standard deviation is 55.60802, which is narrower than the length of the confidence interval for the median absolute deviation from the median, 87.4734
+
+### 7
+
+```{r}
+B = 10000
+bs_cv = numeric(B)
+for (i in 1:B) {
+    boot_sample = sample(x, replace = TRUE) # sampling with replacement == bootstrapping
+    bs_cv[i] = sd(boot_sample)/mean(boot_sample) # compute the coefficient of variation
+}
+quantile(bs_cv, c(0.05, 0.95)) # 90% confidence interval for bootstrapping CV (coefficient of variation)
+```
+
+```{r}
+# bootstrapping CV distribution
+hist(bs_cv)
+```
+
+
+## Cereal
+
+```{r}
+cereal = read_csv("https://raw.githubusercontent.com/DATA2002/data/master/Cereal.csv",
+    na = "-1")
+# if you've downloaded it to your computer cereal =
+# read_delim('Cereals.txt', delim = '\t', na = '-1') Looking at
+# the start of the data
+dplyr::glimpse(cereal)
+```
+
+### 1
+
+```{r}
+cereal %>%
+  drop_na(sugars, sodium) %>% # drop missing data
+  summarise(across(.cols = c("sugars", "sodium"), # for the two columns, sugars and sodium
+                   .fns = list(mean = mean, # apply a list of the following functions
+                               sd = sd, 
+                               min = min,
+                               max = ~quantile(.x, 1), # for some reason, the max function doesn't work here so I used the quantile(.x, 1) function
+                               q2 = ~quantile(.x, 0.25), 
+                               q3 = ~quantile(.x, 0.75)))) %>%
+  tidyr::pivot_longer(cols = everything(), names_sep = "_", names_to = c("nutrient", ".value")) %>% # to make the table look nicer, pivot the table
+  knitr::kable(digits = 2) # kable function creates a good-looking table after you knit it to html
+```
+
+```{r}
+# devtools::install_github("benjaminrich/table1") - install the table1 package
+table1::table1(~sugars + sodium, data = cereal) # the table1 function makes your life easy
+```
+
+### 2
+
+```{r}
+test_dat = cereal %>% 
+  filter(mfr %in% c("G", "K")) %>% # we're only interested in General Mills and Kellog's cereal
+  drop_na(sugars)
+
+# compare the distribution to see whether the equal-variance assumption holds for the two sample t-test
+test_dat %>% 
+  ggplot() + 
+  aes(x = mfr, y = sodium) + 
+  geom_boxplot() + 
+  coord_flip() +
+  theme_bw()
+```
+
+It looks like there is a difference in spread between two manufacturers, with Kellogg’s appearing to have larger variation than General Mills. 👉 Welch two sample $t$-test
+
+```{r}
+test_dat %>%
+  ggplot() +
+  aes(sample = sodium) +
+  geom_qq() +
+  geom_qq_line() + 
+  facet_wrap(~mfr) +
+  theme_bw()
+```
+
+In the General Mills QQ plot, there appears to be some departure from the line at both ends of the distribution (indicating heavier tails than a normal distribution). The points are mostly close to the line in the Kellogg’s sample, except for two cereals which have zero sodium. We’re not totally confident in the normality assumption, though it may still be OK to use a $t$-test because the observations are not wildly far from the line and we have a reasonably large number of observations, so we could instead rely on the central limit theorem to ensure the test statistic at least approximately follows a  $t$-distribution.
+
+### Permutation test for two independent sample data
+
+**Workflow**
+
+1. Combine two independent samples
+
+2. Consider all possible $(n_x + n_y)!$ permutations (or a random subset of permutations)
+
+3. Randomly resample **class labels** ($X,Y$) for all possible permutation times or for pre-specified number of times
+
+4. For each of the re-sampled (permuted) data, perform a two-sample $t$-test to **extract the test statistic**
+\
+⚠️ Although we perform the $t$-test, we're not really using the $t$-distribution. We're just **borrowing the test statistic not caring about its distribution** 👉 **Non-parametric**
+
+5. Compute the proportion of test statistics, as or more extreme than the original $t$-test statistic 👉 **a permuted p-value**
+\
+
+🤔 What if there are outliers?
+
+👉 When there are outliers we can't simply remove them unless it's valid to do so (e.g. incorrect data), as they're also a part of our data.
+
+👉 Instead, we use a more robust test to extract the test statistic
+
+👉 Wilcoxon rank-sum test (Think about why it's more robust than the $t$-test)
+
+### 3
+
+```{r}
+# specify exact = FALSE because there are ties and I don't want it to
+# print the warning message when it defaults to exact = FALSE
+t0 = wilcox.test(sodium ~ mfr, data = test_dat, exact = FALSE)
+t0
+```
+
+```{r}
+B = 10000 # number of permuted samples we will consider
+permuted_dat = test_dat # make a copy of the data
+t_null = vector("numeric", B) # initialise outside loop
+
+for(i in 1:B) {
+  permuted_dat$mfr = sample(test_dat$mfr) # this does the permutation (i.e., randomly resample class labels)
+  t_null[i] = wilcox.test(sodium ~ mfr, # for each permuted sample, perform a Wilcoxon rank-sum test
+                          data = permuted_dat, 
+                          exact = FALSE)$statistic # and extract the Wilcoxon Rank-sum test statistic
+}
+
+# resampled WRS test statistic distribution
+data.frame(t_null) %>% 
+  ggplot() + 
+  aes(x = t_null) + 
+  geom_histogram() + 
+  theme_linedraw() +
+  geom_vline(xintercept = abs(t0$statistic), col = "red", lwd = 2)
+```
+
+It’s a two sided test, so let’s center that distribution at its theoretical mean and consider the absolute value of the test statistic distribution. The method of calculating the test statistic given in the lecture notes has a corresponding mean of $n_x(N+1)/2$. The test statistic used by R is equivalent but a bit different to what we defined in class (see [here](https://stats.stackexchange.com/questions/65844/wilcoxon-rank-sum-test-in-r)). It's different **by a shift of** $n_x(n_x+1)/2$ so we need to calibrate our mean to match the definition of the test statistic used by R
+
+```{r}
+n_x = 22
+n_y = 23
+N = n_x + n_y
+mu_W = n_x*(N+1)/2 # this is what we used in the lecture
+Rmu_W = n_x*(n_x + 1)/2 # this is the amount of difference between what we use and what R uses
+t_mean = mu_W - Rmu_W # calibrate our mean (mu_W) to match the definition of the test statistic used by R
+
+data.frame(t_null = t_null - t_mean) %>% 
+  ggplot() + 
+  aes(x = abs(t_null)) + # only look at the upper tail
+  geom_histogram(boundary = 0) + # set the boundary to 0
+  theme_linedraw() +
+  geom_vline(xintercept = abs(t0$statistic - t_mean),
+             col = "red", lwd = 2)
+```
+
+```{r}
+# calculate a permutation p-value
+mean(abs(t_null - t_mean) >= abs(t0$statistic - t_mean))
+```
+
+The permutation p-value is large (much larger than 0.05), so we do not reject the null hypothesis and conclude that there’s no significant difference between the mean sodium content of the two manufacturers.
+
+```{r}
+# a permutation test using the t-test
+t0 = t.test(sodium ~ mfr, data = test_dat)
+t0
+```
+
+```{r}
+B = 10000 # number of permuted samples we will consider
+permuted_dat = test_dat # make a copy of the data to use permuted_dat to permute class labels inside of the for loop
+t_null = vector("numeric", B) # initialise outside loop
+
+for(i in 1:B) {
+  permuted_dat$mfr = sample(test_dat$mfr, replace = FALSE) # permute the class labels (test_dat$mfr) == permutation t-test for two independent sample data. Then assign these permuted labels to the pooled sample data (observations). Note that permuted_dat has another column: sodium representing (pooled) observations
+  t_null[i] = t.test(sodium ~ mfr, data = permuted_dat)$statistic # for each permuted sample, perform a Welch two sample t-test and extract the test statistic
+}
+```
+
+```{r}
+data.frame(t_null = t_null) %>% 
+  ggplot() + 
+  aes(x = abs(t_null)) + # only look at the upper tail
+  geom_histogram(boundary = 0) + 
+  theme_linedraw() +
+  geom_vline(xintercept = abs(t0$statistic), col = "red", lwd = 2)
+```
+
+```{r}
+mean(abs(t_null) >= abs(t0$statistic))
+```
+
+Again, the permutation p-value is large (much larger than 0.05), so we do not reject the null hypothesis and conclude that there’s no significant difference between the mean sodium content of the two manufacturers.
