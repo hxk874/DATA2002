@@ -24,11 +24,19 @@ knitr::opts_chunk$set(message = FALSE, warning = FALSE)
 
 ```{r, echo=FALSE}
 library(tidyverse)
-library(knitr)
-library(ggplot2)
 library(dplyr)
+
+library(knitr)
+library(kableExtra)
+library(devtools)
+
+library(ggplot2)
+
 library(janitor)
 library(lubridate)
+
+library(stats)
+library(mosaic)
 ```
 
 # Quick Quiz
@@ -53,23 +61,6 @@ data <- matrix(
 kable(data, caption = "Age", 
       row.names = TRUE,
       full_width = F)
-```
- 
- 
-```{r, echo=FALSE}
-# Define the data as a data frame
-data <- data.frame(
-  Smoked = c("Yes", "No"),
-  `Heart attack (Yes)` = c(33, 167),
-  `Heart attack (No)` = c(18, 182)
-)
-
-# Set row names for the first column
-row.names(data) <- data$Smoked
-data$Smoked <- NULL
-
-# Generate the table with a caption
-kable(data, col.names = c("Smoked / Heart Attack", "Yes", "No"))
 ```
 
 Does it look like there’s a significant relationship between age group and violence viewing preference? No need to do a test at this point, just consider the numbers, and the visualisations below.
@@ -101,14 +92,21 @@ gridExtra::grid.arrange(p1, p2, ncol = 2)
 
 103 children attending a pre-school were classified by parents’ income group and by IQ (intelligence quotient).
 
- 
+```{r, echo=FALSE}
+x = matrix(c(14, 25, 23, 18, 8, 15), 
+           ncol = 2)
+
+colnames(x) = c("High IQ", "Moderate/low IQ")
+rownames(x) = c("A", "B", "C")
+
+x %>%
+  kbl() %>%
+  kable_styling(full_width = F)
+```
 
 Does it look like the fractions of IQ differ significantly in the three income groups? No need to do a test at this point, just consider the observed counts, and the visualisations below.
 
 ```{r}
-x = matrix(c(14, 25, 23, 18, 8, 15), ncol = 2)
-colnames(x) = c("High IQ", "Moderate/low IQ")
-rownames(x) = c("A", "B", "C")
 y = x |> as.data.frame() |> 
   tibble::rownames_to_column(var = "income") |> 
   tidyr::pivot_longer(c("High IQ", "Moderate/low IQ"), 
@@ -132,6 +130,30 @@ gridExtra::grid.arrange(p1, p2, ncol = 2)
 
 ## Personality type
 
+A psychologist is interested in testing whether there is a difference in the distribution of personality types for business majors and social science majors. She performs a personality test on a random sample of 258 business students and a random sample of 355 social science students. The results of the study are shown in the table below. 
+
+1. Visualise the data. 
+
+
+2. What is the appropriate test in this context? [I.e. a test of goodness of fit, homogeneity or independence.] 
+
+3. Perform the test using a 5% level of significance.
+
+
+```{r}
+counts = c(41, 52, 46, 61, 58, 72, 75, 63, 80, 65)
+c_mat = matrix(counts, nrow = 2, byrow = TRUE)
+colnames(c_mat) = c("Open", "Conscientious", "Extrovert", "Agreeable", "Neurotic")
+rownames(c_mat) = c("Business", "Social Science")
+```
+
+```{r}
+c_mat %>%
+  kbl() %>%
+  kable_styling(full_width = F)
+```
+
+
 1. Visualise the data. 
 
 ```{r}
@@ -141,15 +163,12 @@ colnames(c_mat) = c("Open", "Conscientious", "Extrovert", "Agreeable", "Neurotic
 rownames(c_mat) = c("Business", "Social Science")
 
 # very simple display method, where you don't have to convert into a df first.
-mosaicplot(t(c_mat))
+par(mar=c(0,1,1,0)) # controls the margins of this base R plot
+mosaicplot(t(c_mat), main = NULL)
 ```
-```{r}
-install.packages("reshape2")
-```
+In a mosaic plot, the lengths of the rectangles across are proportional to the number of cells across both the x and the y axes. It’s a generalisation of a stacked bar chart where the bars lengths are proportional to the number in each category.
 
-
-
-
+To visualise using ggplot2, we need to first create a data frame:
 ```{r}
 # convert into a df to display.
 data.frame(
@@ -164,63 +183,159 @@ df <- df |>
                       names_to = "personality",
                       values_to = "counts")
 ```
-
-Plot data
+We can now use this as the input to the `ggplot()` function to generate either a bar plot representing the counts or a bar plot representing the proportions.
 
 ```{r}
-library(ggplot2)
 df |> ggplot() + 
-  aes(x = major, y=counts, fill = personality) +
-  geom_col(position = "fill") + 
-  scale_fill_brewer(palette = "Set1") +
+  aes(x = major, y = counts, fill = personality) + 
+  geom_col() + 
+  scale_fill_brewer(palette = "Set1") + 
   coord_flip() + 
-  labs(y="% of students", x="Major", fill="Personality type") + 
-  scale_y_continuous(labels = scales::percent) +
-  guides(fill = guide_legend(reverse = TRUE)) +
+  labs(y = "Number of students", x = "Major", fill = "Personality type") + 
+  guides(fill = guide_legend(reverse = TRUE)) + 
   theme(legend.position = "top")
 ```
 
-2. What is the appropriate test in this context? [I.e. a test of goodness of fit, homogeneity or independence.] 
-Perform the test using a 5% level of significance.
+```{r}
+df |> ggplot() + 
+  aes(x = major, y = counts, fill = personality) + 
+  geom_col(position = "fill") + 
+  scale_fill_brewer(palette = "Set1") + 
+  coord_flip() + 
+  labs(y = "Percent of students", x = "Major", fill = "Personality type") +
+  scale_y_continuous(labels = scales::percent) + 
+  guides(fill = guide_legend(reverse = TRUE)) + 
+  theme(legend.position = "top")
+```
+
+
+2. What is the appropriate test in this context? I.e. a test of goodness of fit, homogeneity or independence. Perform the test using a 5% level of significance.
+
+The most appropriate test here is a test for homogeneity because we have sampled from two different populations (the population of business students and the population of social science students).
 
 ```{r}
 # check: expected must always be greater than 5:
-chisq.test(c_mat)$expected
-
-chisq.test(c_mat)
+chisq.test(c_mat)$expected |> round(1)
 ```
-We don't reject the H0 hypothesis, since p-value = 0.5568 > 0.05
-
-
-# Shocking
 
 ```{r}
-x = matrix(c(12, 4, 5, 9), ncol = 2)
-colnames(x) = c("Togehter", "Alone") # D
-rownames(x) = c("High", "Low") # R
-
-df <- data.frame(x)
-df
+# Perform chi^2 test
+chisq.test(c_mat)
 ```
+
+### Workflow
+
+1. Hypothesis
+
+$H_0$ : The distribution of personality types is the same for both majors
+
+$H_1$ : The distribution of personality types is not the same for both majors
+
+2. Assumption
+
+- Observations are randomly selected: $e_ i =np_i\ge5 \ \ \text{for all} \ i$
+
+Confirmed by calculating the expected cell counts 
+
+- Independent observations.
+
+Confirmed as we are told there was random sampling from each population.
+
+
+3. Test Statistic
+$$T = \sum_{i=1}^{r} \sum_{j=1}^{c} \frac{(Y_{ij}-e_{ij})^2}{e_{ij}} \sim \chi_{(r-1)(c-1)}^2 \ \ \text{ Under } \ H_0$$
+
+4. Observed Test Statistic, $t_0 = 3.006$
+$$t_0 = \sum_{i=1}^{2} \sum_{j=1}^{5} \frac{(y_{ij}-e_{ij})^2}{e_{ij}} \sim \chi_{1 \times 4}^2 \ \ \text{ Under } \ H_0 = 3.006$$
+
+5. P-value
+$$P(T\ge t_0) = P(\chi_{4}^2 \ge 3.006)=0.5568$$
+How to find the p-value:
+```{r}
+# calculate the p-value manually either
+1 - pchisq(q = 3.006, df = 4)
+
+# or equivalently
+pchisq(q = 3.006, df = 4, lower.tail = FALSE)
+```
+
+
+6. Decision
+
+Since the p-value much greater than 0.05, we do not reject $H_0$. There is insufficient evidence to conclude that the distribution of personality types is different for business and social science majors. Another way of saying this is: the data are consistent with the null hypothesis that the distribution of personality types is the same across business and social science majors.
+
+
+## Shocking
+
+A psychological experiment was done to investigate the effect of anxiety on a person’s desire to be alone or in company.
+
+A group of 30 subjects was randomly divided into two groups of sizes 13 and 17.
+
+The subjects were all told that they would be subject to electric shocks.
+
+* The “high anxiety” group was told that the shocks would be quite painful
+* The “low anxiety” group was told that they would be mild and painless
+
+Both groups were told that there would be a 10 minute wait before the experiment began and each subject was given the choice of waiting alone or with other subjects.
+
+The results were as follows:
+
+```{r}
+x = matrix(c(12, 4, 16, 5, 9, 14, 17, 13, 30), ncol = 3)
+colnames(x) = c("Togehter", "Alone", "Total") # D
+rownames(x) = c("High", "Low", "Total") # R
+df <- data.frame(x)
+
+df %>%
+  kbl() %>%
+  kable_styling(full_width = F)
+```
+
 1. If we’re picking between homogeneity and independence, which is more appropriate here?
 
-Homogeneity 
+In this example, we started with one population, but then we stratified by anxiety, so in a sense we have **two groups** (sub-populations), one where we told them the shock would be quite painful and the other where we told them it would be mild. In this context it is more like a test for **homogeneity** where 
+$$H_0 : \text{the proportion of people who choose to wait alone is the same in both groups and the proportion of people who choose to wait together is the same in both groups}$$
 
-## Perform test
+2. At the 5% level of significance perform each of the following tests:
+
+i)   Fisher’s exact test
+ii)  A chi-squared test without a continuity correction
+iii) A chi-squared test with a continuity correction.
+iv)  A chi-squared test using a Monte Carlo p-value (i.e. using simulation).
+
+3. Do the results of the different tests agree? Which are you most convinced by?
+
+4. Would it make sense to calculate a relative risk here? Calculate the odds ratio, confidence interval and provide an interpretation.
+
+
+
+### Perform test
 At the 5% level of significance perform each of the following tests:
+
+```{r}
+counts = c(12, 5, 4, 9)
+c_mat = matrix(counts, ncol = 2, byrow = TRUE)
+colnames(c_mat) = c("Together", "Alone")
+rownames(c_mat) = c("High", "Low")
+c_mat
+```
+
 
 i) Fisher’s exact test
 
-non-parametric. Doesnot assume an underlying distribution
+- Non-parametric. 
+- Doesn't assume an underlying distribution.
+
 ```{r}
-library(stats)
-fisher.test(df)
+fisher.test(c_mat)
 ```
 p-value = 0.0634 > 0.05 => we don't reject $h_0$
 
+
 ii)  A chi-squared test without a continuity correction
+
 ```{r}
-chisq.test(df, correct = FALSE)
+chisq.test(c_mat, correct = FALSE)
 ```
 p-value = 0.0303 < 0.05 => we reject $h_0$
 
@@ -228,72 +343,142 @@ p-value = 0.0303 < 0.05 => we reject $h_0$
 
 iii) A chi-squared test with a continuity correction.
 ```{r}
-chisq.test(df, correct = TRUE)
+chisq.test(c_mat, correct = TRUE)
 ```
-p-value = 0.0723 > 0.05 => we don't reject $h_0$
-
-
+p-value = 0.07 > 0.05 => we don't reject $h_0$
 
 iv)  A chi-squared test using a Monte Carlo p-value (i.e. using simulation).
+
 ```{r}
-chisq.test(df, simulate.p.value = TRUE, B=20000)
+set.seed(1)
+chisq.test(c_mat, simulate.p.value = TRUE, B = 20000)
 ```
-p-value = 0.0619 > 0.05 => we don't reject $h_0$
-
-Or perform it manually:
-
-simulating tables 20,000 times. Keeps the same total for rows/cols
-user-defined function from matrix
-=> vector of matrices randomly generated
-
-result to the right of hist => represents p-value
-
-2. Do the results of the different tests agree?
-
-No, ii) differs. 
-
-
-3. Which are you most convinced by?
-
-NOT ii) and iii)
-
-The corrects is i)! almost always go with it.
-
-4. Would it make sense to calculate a relative risk here? 
-
-Calculate the odds ratio, confidence interval and provide an interpretation.
+p-value = 0.064 > 0.05 => we don't reject $h_0$
 
 ```{r}
-mosaic::oddsRatio(df,verbose=TRUE)
+# if you want to do the simulation "manually":
+# 1. extract the test statistic from the original data
+test_stat = chisq.test(c_mat, correct = FALSE)$statistic
+# 2. generate 20000 tables with the same margins as the
+#    observed data
+set.seed(2002)
+rand_tables = r2dtable(n = 20000, r = rowSums(c_mat), c = colSums(c_mat))
+# 3. calculate the the test statistic (without a continuity correction)
+#    for each of the randomly generated tables.
+#    Notes: lapply() applys a function to each of the elements in a list
+#           unlist() takes a list and converts it to a vector
+sim_stats = unlist(lapply(rand_tables, 
+                          function(x) chisq.test(x, correct = FALSE)$statistic))
+#    You could also do this using a for loop
+# 4. have a look at the distribution of the test statistics
+#    that were generated under the null hypothesis of independence
+hist(sim_stats, breaks = 30)
+```
+
+```{r}
+# 5. calculate the Monte Carlo p-value as the proportion of 
+#    simulated test statistics that are more extreme than 
+#    the text statistic that we observed.
+mean(sim_stats >= test_stat)
+```
+
+p-value = 0.0657 > 0.05 => we don't reject $h_0$
+
+### Conclusion
+
+3. Do the results of the different tests agree? Which are you most convinced by?
+
+Only the chi-squared test without the continuity correction gave a p-value that was less than 0.05. We’re more convinced by the other approaches which give more reliable results, particularly when the sample sizes are small. The Monte Carlo p-value is very similar to Fisher’s exact test (these would be our most preferred solutions) while the p-value for a chi-squared test with continuity correction is slightly larger.
+
+For the odds ratio,
+
+- NOT ii) and iii) chi
+- The corrects is i) Fisher's! almost always go with it.
+
+
+4. Would it make sense to calculate a relative risk here? Calculate the odds ratio, confidence interval and provide an interpretation.
+
+
+```{r}
+mosaic::oddsRatio(c_mat, verbose = TRUE)
 ```
 If the 95% CI for an odds ratio does not include 1.0, then the odds ratio is considered to be statistically significant at the 5% level.
 
 OR => significant
 
+In this example we have sampled from the two groups (i.e. we fixed the number in the high group and we fixed the number in the low group), so it makes sense to estimate the conditional probabilities $P$(Together | High) and $P$(Together | Low).
 
-# Asbestos
 
+If we interpret this output,
+
+
+**Relative risk**:
+
+* `Prop. 1: 0.7059` is our estimate of $P$(Together | High), the proportion of subjects who preferred to wait together in the high anxiety group (12/(12+5)).
+
+* `Prop. 2: 0.3077` is our estimate of $P$(Together | Low), is the proportion of subjects who preferred to wait together in the low anxiety group (4/(4+9)).
+
+* Relative risk: is the ratio of these two conditional probabilities, 
+$$\text{Rel. Risk} 0.4359 = \text{(Prop. 2)/(Prop. 1)} = 0.3077 / 0.7059 = 0.44$$
+This is different to what we would have done from the lecture, where we would have calculated (Prop. 1)/(Prop. 2) = 0.7059 / 0.3077 = 2.3. Either way is OK so long as we adjust the interpretation.
+    * For the 2.3 relative risk, we’re saying that subjects who were told that it would be a painful shock were 2.3 times more likely to wait together than subjects who were told it wouldn’t be painful.
+    * For the 0.44 relative risk, we’re saying that subjects who were told that it would not be a painful shock were 0.44 times more likely (i.e. they were less likely) to wait together than subjects who were told it would be painful.
+
+**Odds Ratio**:
+
+* `Odds 1: 2.4` is our estimate of $P$(Together | High) = $P$(Together | High) /$P$(Alone | High), the odds of subjects who preferred to wait together in the high anxiety group to (0.7059/(1-0.7059)).
+
+* `Odds 2: 0.4444` is our estimate of $P$(Together | Low) = $P$(Together | Low) / $P$(Alone | Low), the odds of subjects who preferred to wait together in the low anxiety group to (0.3077/(1-0.3077)).
+
+* Odds Ratio: `0.1852 = Odds 2/Odds 1 = 0.4444/2.4`. 
+If we were following the approach in the lecture slides we would have calculated `Odds 1/Odds 2 = 2.4/0.4444 = 5.4`. Either way we just need to adjust our interpretation.
+
+    * For the 5.4 odds ratio, we’re saying that the odds of waiting together for the painful shock group are 5.4 times the odds of waiting together for the mild shock group.
+
+    * For the 0.19 odds ratio, we’re saying that the odds of waiting together for the mild shock group are 0.19 times the odds of waiting together for the painful shock group.
+    
+**Comparing to the null hypothesis**:
+
+The null hypothesis is that the odds ratio is equal to 1 (no association). The 95% confidence interval for the odds ratio, (0.0384, 0.8932) does not contain 1, therefore we would reject the null hypothesis. HOWEVER, remember that the calculation of the confidence interval for the odds ratio, relied on similar assumptions to the chi-squared test, i.e. we need “reasonably large” sample sizes in each of the cells (can think of this as the expected cell counts of at least 5 assumption).
+
+Note: to get the same values as we would have calculated in lectures, we just need to flip the rows in the table:
+```{r}
+mosaic::oddsRatio(c_mat[2:1,], verbose = TRUE)
+```
+
+
+## Asbestos
+
+One of the breakthroughs that demonstrated the dangers to the exposure of asbestos is due to a study undertaken in the 1960’s (data reported in Selikoff (1981)). Chest x-rays of a sample of 1117 workers in New York were taken to determine the damage done due to the occupational exposure of the workers to asbestos fibres. These workers were classified according to their years of exposure to the fibres and the severity of asbestosis that they were diagnosed with. The data appear in the following contingency table
 
 ```{r}
 asbestos = matrix(c(310, 212, 21, 25, 7, 36, 158, 35, 102, 
                     35, 0, 9, 17, 49, 51, 0, 0, 4, 18, 28), nrow = 5)
 colnames(asbestos) = c("None", "Grade 1", "Grade 2", "Grade 3")
 rownames(asbestos) = c("0-9", "10-19", "20-29", "30-39", "40+")
+df <- data.frame(asbestos)
+
+df %>%
+  kbl() %>%
+  kable_styling(full_width = F)
+```
+
+
+```{r}
 y = asbestos |> as.data.frame() |> 
   tibble::rownames_to_column(var = "years") |> 
   tidyr::gather(key = grade, value = count, -years)
 y$grade = factor(y$grade, levels = c("None", "Grade 1", "Grade 2", "Grade 3"), ordered = TRUE)
 ggplot(y, aes(x = years, y = count, fill = grade)) + 
   geom_bar(stat = "identity") + 
-  theme_bw(base_size = 16) + 
+  theme_grey() + 
   scale_fill_brewer(palette = "Set1") + 
   labs(fill = "", y = "Count", x = "Occupational exposure (yrs)")
 ```
 
-1. Adapt the ggplot2 code above such that the y-axis is a proportion within each exposure length group. Does it look like there’s a relationship between the two variables?
+1. Adapt the **ggplot2** code above such that the y-axis is a proportion within each exposure length group. Does it look like there’s a relationship between the two variables?
 
 ```{r}
-
 y = asbestos |> as.data.frame() |> 
   tibble::rownames_to_column(var = "years") |> 
   tidyr::gather(key = grade, value = count, -years)
@@ -301,25 +486,25 @@ y = asbestos |> as.data.frame() |>
 y$grade = factor(y$grade, levels = c("None", "Grade 1", "Grade 2", "Grade 3"), ordered = TRUE)
 ggplot(y, aes(x = years, y = count, fill = grade)) + 
   geom_bar(stat = "identity", position = "fill") +  
-  theme_bw(base_size = 16) + 
+  theme_grey()  + 
   scale_fill_brewer(palette = "Set1") + 
   labs(fill = "", y = "Count", x = "Occupational exposure (yrs)")
 ```
 
 
 
-2. Use the function chisq.test() to perform a standard chi-squared test of independence to determine whether there exists a statistically significant association between years of exposure to asbestos fibres and the severity of asbestosis that they were diagnosed with.
+2. Use the function `chisq.test()` to perform a standard chi-squared test of independence to determine whether there exists a statistically significant association between years of exposure to asbestos fibres and the severity of asbestosis that they were diagnosed with.
 
 We cant use chi test, since expected is < 5 at the rightmost column
 => p-value = 0 < 0.05 => we reject the $H_0$
 
-3. Use x = r2dtable(____) to randomly generate a contingency table with the same row and column totals as asbestos. Perform a chi-squared test and extract the test statistic using chisq.test(x[[1]])$statistic.
+3. Use `x = r2dtable(____)` to randomly generate a contingency table with the same row and column totals as `asbestos`. Perform a chi-squared test and extract the test statistic using `chisq.test(x[[1]])$statistic`.
 
 
-4. By using the r2dtable() function, perform a Monte-Carlo simulation to determine the p-value for the chi-squared test of independence. Generate 10,000 bootstrap resamples. Note: if doing this in an Rmd script, you might want to wrap your chisq.test(___)$statistic in suppressWarnings() so they don’t slow down your computer, e.g. suppressWarnings(chisq.test(___)$statistic). Plot a histogram of your Monte Carlo test statistics.
+4. By using the `r2dtable()` function, perform a Monte-Carlo simulation to determine the p-value for the chi-squared test of independence. Generate 10,000 bootstrap resamples. Note: if doing this in an Rmd script, you might want to wrap your `chisq.test(___)$statistic` in `suppressWarnings()` so they don’t slow down your computer, e.g. `suppressWarnings(chisq.test(___)$statistic)`. Plot a histogram of your Monte Carlo test statistics.
 
 
-5. Use the chisq.test() function to perform a Monte-Carlo simulation that obtains a p-value. Do so using 10,000 bootstrap resamples.
+5. Use the `chisq.test()` function to perform a Monte-Carlo simulation that obtains a p-value. Do so using 10,000 bootstrap resamples.
 
 
 

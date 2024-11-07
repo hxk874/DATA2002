@@ -25,6 +25,8 @@ knitr::opts_chunk$set(message = FALSE, warning = FALSE)
 ```{r, echo=FALSE}
 library(tidyverse)
 library(knitr)
+library(kableExtra)
+library(devtools)
 library(ggplot2)
 library(dplyr)
 library(janitor)
@@ -96,6 +98,8 @@ Let R do the calculations:
 ```{r}
 chisq.test(y_i, p = p_i)
 ```
+
+### Workflow
 
 1. Hypothesis
 
