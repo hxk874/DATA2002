@@ -1,0 +1,327 @@
+---
+title: "Lab 01C: Week 4"
+author: "Ellen Ebdrup"
+date: "2024-08-22"
+output: 
+  html_document: 
+    ### IMPORTANT ###
+    # self_contained: true # Creates a single HTML file as output
+    code_folding: show # Code folding; allows you to show/hide code chunks
+    ### USEFUL ###
+    code_download: true # Includes a menu to download the code file
+    ### OPTIONAL ###
+    df_print: paged # Sets how dataframes are automatically printed
+    theme: readable # Controls the font, colours, etc.
+    toc: true # (Useful) Creates a table of contents!
+    toc_float: true # table of contents at the side
+    number_sections: false # (Optional) Puts numbers next to heading/subheadings
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(message = FALSE, warning = FALSE)
+```
+
+```{r, echo=FALSE}
+library(tidyverse)
+library(knitr)
+library(ggplot2)
+library(dplyr)
+library(janitor)
+library(lubridate)
+```
+
+# Quick Quiz
+
+## TV violence
+
+A study of the amount of violence viewed on television as it relates to the age of the viewer yields the results shown in the accompanying table for 81 people.
+ 
+```{r, echo=FALSE}
+# Define the data in a matrix format for clearer organization
+data <- matrix(
+  c(8, 12, 21, 18, 15, 7),
+  nrow = 2,
+  byrow = TRUE,
+  dimnames = list(
+    c("Low violence", "High violence"),
+    c(" 16-34 ", " 35-54 ", " 55 and over ")
+  )
+)
+
+# Generate the table with a caption
+kable(data, caption = "Age", 
+      row.names = TRUE,
+      full_width = F)
+```
+ 
+ 
+```{r, echo=FALSE}
+# Define the data as a data frame
+data <- data.frame(
+  Smoked = c("Yes", "No"),
+  `Heart attack (Yes)` = c(33, 167),
+  `Heart attack (No)` = c(18, 182)
+)
+
+# Set row names for the first column
+row.names(data) <- data$Smoked
+data$Smoked <- NULL
+
+# Generate the table with a caption
+kable(data, col.names = c("Smoked / Heart Attack", "Yes", "No"))
+```
+
+Does it look like there’s a significant relationship between age group and violence viewing preference? No need to do a test at this point, just consider the numbers, and the visualisations below.
+
+```{r}
+x = matrix(c(8, 18, 12, 15, 21, 7), ncol = 3)
+colnames(x) = c("16-34", "35-54", "54+")
+rownames(x) = c("Low violence", "High violence")
+y = x |> as.data.frame() |> 
+  tibble::rownames_to_column(var = "viewing") |> 
+  tidyr::pivot_longer(cols = c("16-34", "35-54", "54+"), 
+                      names_to = "age", values_to = "count")
+p_base = ggplot(y, aes(x = age, y = count, fill = viewing)) + 
+  theme_bw(base_size = 12) + 
+  scale_fill_brewer(palette = "Set1") + 
+  labs(fill = "", x = "Age group") +
+  theme(legend.position = "top")
+p1 = p_base + 
+  geom_bar(stat = "identity") + 
+  labs(y = "Count") 
+p2 = p_base + 
+  geom_bar(stat = "identity", position = "fill") + 
+  labs(y = "Proportion")
+gridExtra::grid.arrange(p1, p2, ncol = 2)
+```
+
+
+## Income and IQ
+
+103 children attending a pre-school were classified by parents’ income group and by IQ (intelligence quotient).
+
+ 
+
+Does it look like the fractions of IQ differ significantly in the three income groups? No need to do a test at this point, just consider the observed counts, and the visualisations below.
+
+```{r}
+x = matrix(c(14, 25, 23, 18, 8, 15), ncol = 2)
+colnames(x) = c("High IQ", "Moderate/low IQ")
+rownames(x) = c("A", "B", "C")
+y = x |> as.data.frame() |> 
+  tibble::rownames_to_column(var = "income") |> 
+  tidyr::pivot_longer(c("High IQ", "Moderate/low IQ"), 
+                      names_to = "iq", values_to = "count")
+p_base = ggplot(y, aes(x = income, y = count, fill = iq)) + 
+  theme_bw(base_size = 12) + 
+  scale_fill_brewer(palette = "Set1") + 
+  labs(fill = "", x = "Income group") +
+  theme(legend.position = "top")
+p1 = p_base + 
+  geom_bar(stat = "identity") + 
+  labs(y = "Count") 
+p2 = p_base + 
+  geom_bar(stat = "identity", position = "fill") + 
+  labs(y = "Proportion")
+gridExtra::grid.arrange(p1, p2, ncol = 2)
+```
+
+
+# Exercises
+
+## Personality type
+
+1. Visualise the data. 
+
+```{r}
+counts = c(41, 52, 46, 61, 58, 72, 75, 63, 80, 65)
+c_mat = matrix(counts, nrow = 2, byrow = TRUE)
+colnames(c_mat) = c("Open", "Conscientious", "Extrovert", "Agreeable", "Neurotic")
+rownames(c_mat) = c("Business", "Social Science")
+
+# very simple display method, where you don't have to convert into a df first.
+mosaicplot(t(c_mat))
+```
+```{r}
+install.packages("reshape2")
+```
+
+
+
+
+```{r}
+# convert into a df to display.
+data.frame(
+  counts = counts,
+  major=c(rep("Business",5), rep("Social Science",5)), 
+  personality= rep(c("Open", "Conscientious", "Extrovert", "Agreeable", "Neurotic"), 2))
+
+df <- as.data.frame(c_mat)
+df <- df |>
+  tibble::rownames_to_column("major") |> 
+  tidyr::pivot_longer(cols=!major, # columns that are not the "major" column
+                      names_to = "personality",
+                      values_to = "counts")
+```
+
+Plot data
+
+```{r}
+library(ggplot2)
+df |> ggplot() + 
+  aes(x = major, y=counts, fill = personality) +
+  geom_col(position = "fill") + 
+  scale_fill_brewer(palette = "Set1") +
+  coord_flip() + 
+  labs(y="% of students", x="Major", fill="Personality type") + 
+  scale_y_continuous(labels = scales::percent) +
+  guides(fill = guide_legend(reverse = TRUE)) +
+  theme(legend.position = "top")
+```
+
+2. What is the appropriate test in this context? [I.e. a test of goodness of fit, homogeneity or independence.] 
+Perform the test using a 5% level of significance.
+
+```{r}
+# check: expected must always be greater than 5:
+chisq.test(c_mat)$expected
+
+chisq.test(c_mat)
+```
+We don't reject the H0 hypothesis, since p-value = 0.5568 > 0.05
+
+
+# Shocking
+
+```{r}
+x = matrix(c(12, 4, 5, 9), ncol = 2)
+colnames(x) = c("Togehter", "Alone") # D
+rownames(x) = c("High", "Low") # R
+
+df <- data.frame(x)
+df
+```
+1. If we’re picking between homogeneity and independence, which is more appropriate here?
+
+Homogeneity 
+
+## Perform test
+At the 5% level of significance perform each of the following tests:
+
+i) Fisher’s exact test
+
+non-parametric. Doesnot assume an underlying distribution
+```{r}
+library(stats)
+fisher.test(df)
+```
+p-value = 0.0634 > 0.05 => we don't reject $h_0$
+
+ii)  A chi-squared test without a continuity correction
+```{r}
+chisq.test(df, correct = FALSE)
+```
+p-value = 0.0303 < 0.05 => we reject $h_0$
+
+
+
+iii) A chi-squared test with a continuity correction.
+```{r}
+chisq.test(df, correct = TRUE)
+```
+p-value = 0.0723 > 0.05 => we don't reject $h_0$
+
+
+
+iv)  A chi-squared test using a Monte Carlo p-value (i.e. using simulation).
+```{r}
+chisq.test(df, simulate.p.value = TRUE, B=20000)
+```
+p-value = 0.0619 > 0.05 => we don't reject $h_0$
+
+Or perform it manually:
+
+simulating tables 20,000 times. Keeps the same total for rows/cols
+user-defined function from matrix
+=> vector of matrices randomly generated
+
+result to the right of hist => represents p-value
+
+2. Do the results of the different tests agree?
+
+No, ii) differs. 
+
+
+3. Which are you most convinced by?
+
+NOT ii) and iii)
+
+The corrects is i)! almost always go with it.
+
+4. Would it make sense to calculate a relative risk here? 
+
+Calculate the odds ratio, confidence interval and provide an interpretation.
+
+```{r}
+mosaic::oddsRatio(df,verbose=TRUE)
+```
+If the 95% CI for an odds ratio does not include 1.0, then the odds ratio is considered to be statistically significant at the 5% level.
+
+OR => significant
+
+
+# Asbestos
+
+
+```{r}
+asbestos = matrix(c(310, 212, 21, 25, 7, 36, 158, 35, 102, 
+                    35, 0, 9, 17, 49, 51, 0, 0, 4, 18, 28), nrow = 5)
+colnames(asbestos) = c("None", "Grade 1", "Grade 2", "Grade 3")
+rownames(asbestos) = c("0-9", "10-19", "20-29", "30-39", "40+")
+y = asbestos |> as.data.frame() |> 
+  tibble::rownames_to_column(var = "years") |> 
+  tidyr::gather(key = grade, value = count, -years)
+y$grade = factor(y$grade, levels = c("None", "Grade 1", "Grade 2", "Grade 3"), ordered = TRUE)
+ggplot(y, aes(x = years, y = count, fill = grade)) + 
+  geom_bar(stat = "identity") + 
+  theme_bw(base_size = 16) + 
+  scale_fill_brewer(palette = "Set1") + 
+  labs(fill = "", y = "Count", x = "Occupational exposure (yrs)")
+```
+
+1. Adapt the ggplot2 code above such that the y-axis is a proportion within each exposure length group. Does it look like there’s a relationship between the two variables?
+
+```{r}
+
+y = asbestos |> as.data.frame() |> 
+  tibble::rownames_to_column(var = "years") |> 
+  tidyr::gather(key = grade, value = count, -years)
+
+y$grade = factor(y$grade, levels = c("None", "Grade 1", "Grade 2", "Grade 3"), ordered = TRUE)
+ggplot(y, aes(x = years, y = count, fill = grade)) + 
+  geom_bar(stat = "identity", position = "fill") +  
+  theme_bw(base_size = 16) + 
+  scale_fill_brewer(palette = "Set1") + 
+  labs(fill = "", y = "Count", x = "Occupational exposure (yrs)")
+```
+
+
+
+2. Use the function chisq.test() to perform a standard chi-squared test of independence to determine whether there exists a statistically significant association between years of exposure to asbestos fibres and the severity of asbestosis that they were diagnosed with.
+
+We cant use chi test, since expected is < 5 at the rightmost column
+=> p-value = 0 < 0.05 => we reject the $H_0$
+
+3. Use x = r2dtable(____) to randomly generate a contingency table with the same row and column totals as asbestos. Perform a chi-squared test and extract the test statistic using chisq.test(x[[1]])$statistic.
+
+
+4. By using the r2dtable() function, perform a Monte-Carlo simulation to determine the p-value for the chi-squared test of independence. Generate 10,000 bootstrap resamples. Note: if doing this in an Rmd script, you might want to wrap your chisq.test(___)$statistic in suppressWarnings() so they don’t slow down your computer, e.g. suppressWarnings(chisq.test(___)$statistic). Plot a histogram of your Monte Carlo test statistics.
+
+
+5. Use the chisq.test() function to perform a Monte-Carlo simulation that obtains a p-value. Do so using 10,000 bootstrap resamples.
+
+
+
+
+
