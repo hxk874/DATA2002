@@ -1,6 +1,6 @@
 ---
 title: "Lab 01A: Week 2"
-date: "`r Sys.Date()`"
+date: "2024-08-07"
 author: "Ellen Ebdrup"
 output: 
   html_document: 
@@ -142,7 +142,6 @@ data <- data.frame(
 
 # Generate the table
 kable(data)
-
 ```
 Of 100 randomly selected patients, there are 44 nonsmokers, 24 current smokers, 13 tobacco chewers and 19 ex-smokers. Should the researcher revise his estimates? Use 0.01 as the level of significance.
 

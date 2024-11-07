@@ -1,0 +1,431 @@
+---
+title: "Week 5 Lab"
+date: "`r Sys.Date()`"
+author: "Tutor: Sanghyun Kim"
+output: 
+  html_document: 
+    ### IMPORTANT ###
+    # self_contained: true # Creates a single HTML file as output
+    code_folding: hide # Code folding; allows you to show/hide code chunks
+    ### USEFUL ###
+    code_download: true # Includes a menu to download the code file
+    ### OPTIONAL ###
+    df_print: paged # Sets how dataframes are automatically printed
+    theme: readable # Controls the font, colours, etc.
+    toc: true # (Useful) Creates a table of contents!
+    toc_float: true # table of contents at the side
+    number_sections: false # (Optional) Puts numbers next to heading/subheadings
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(message = FALSE, warning = FALSE)
+```
+
+```{r}
+library(tidyverse)
+```
+
+# Week 4 Lecture Recap
+
+## Type Ⅰ & Ⅱ Error
+
+|      |  **True $H_0$**  |  **False $H_0$**  |
+|:----:|:----:|:----:|
+| **Reject $H_0$** | Type Ⅰ Error ($\alpha$) | Statistical Power (1-$\beta$) |
+| **Don't reject $H_0$** | Correct Decision | Type Ⅱ Error ($\beta$) |
+\
+\
+
+- Type Ⅰ Error (*False Positive*) $\ \ $ 👉 $\ \ $ $P\left(\text{Reject $H_0$} \ | \ \text{True $H_0$}\right)=\alpha$
+
+- Type Ⅱ Error (*False Negative*) $\ \ $ 👉 $\ \ $ $P\left(\text{Don't reject $H_0$} \ | \ \text{False $H_0$}\right)=\beta$
+
+- Statistical Power $\ \ $ 👉 $\ \ $ $P\left(\text{Reject $H_0$} \ | \ \text{False $H_0$}\right)=1-\beta$
+
+\
+
+$\alpha$ (Type Ⅰ Error) ↓ $\ \ \ $ 👉 $\ \ \ $ $\beta$ (Type Ⅱ Error) ↑ $\ \ \ $ 👉 $\ \ \ $ $1-\beta$ (Statistical Power) ↓
+
+$\alpha$ (Type Ⅰ Error) ↑ $\ \ \ $ 👉 $\ \ \ $ $\beta$ (Type Ⅱ Error) ↓ $\ \ \ $ 👉 $\ \ \ $ $1-\beta$ (Statistical Power) ↑
+
+Why? 
+
+👉 If we use small $\alpha$ (e.g. 0.0000001) to reduce the chances of making a type Ⅰ error, then **we're very unlikely to reject any $H_0$ (regardless of whether it's true or false $H_0$)**, since we'll reject $H_0$ if and only if the p-value is smaller than 0.0000001.
+\
+While it decreases the probability of not rejecting true $H_0$, **it increases the probability of not rejecting false $H_0$ (i.e. $\beta$: type Ⅱ error)** at the same time, and thus, it decreases statistical power ($1-\beta$).
+
+In a context where making a type Ⅰ error is more dangerous than the type Ⅱ error, we can make $\alpha$ small at the cost of increasing the chances of making a type Ⅱ error.
+
+I encourage you to think about the other case too. What happens if we increase $\alpha$ in a context where making a type Ⅱ error is more dangerous than the type Ⅰ error? How and why $\beta$ and statistical power change, as $\alpha$ decreases?
+
+\
+\
+
+## Statistical Power
+
+### Power as a function of $\mu$
+
+![](Power1.png)
+
+The power of a test ↑, as we observe a sample mean $\bar{x}$ far away from the $\mu=375$.
+
+👉 As $|\bar{x} - \mu|$ ↑, power ↑
+
+In other words, as we observe $\bar{x}$ such that $|\bar{x} - \mu|$ is large, we're confident that we'll correctly reject false $H_0$.
+\
+
+### Power as a function of $\alpha$
+
+![](Power2.png)
+
+When $\alpha = 0.05$ (orange curve), to achieve a certain level of power (the probability that we correctly reject false $H_0$), it requires smaller $|\bar{x} - \mu|$.
+
+To achieve the same level of statistical power with much smaller $\alpha$ (purple curve), it requires much larger $|\bar{x} - \mu|$ because you'll only reject $H_0$ if and only if the p-value is less than $0.000001$.
+
+⚠️ Again, if we use large $\alpha$ to increase statistical power, it'll also increase the probability that we incorrectly reject true $H_0$.
+\
+
+### Power as a function of $n$
+
+![](Power3.png)
+
+The power of a test ↑, as the sample size $n$ ↑
+
+# Exercises
+
+## Blood alcohol readings
+
+### One-sample $t$-test
+
+```{r}
+bac = c(12.3, 12.7, 12.6, 13.1, 13.2, 12.8, 13.1, 12.9, 13.1, 12.4,
+        13.6, 12.7, 12.6, 13.1, 12.4, 12.6, 13.3, 12.6, 12.4, 13.1, 
+        12.9, 12.6, 12.7, 12.5, 12.4, 12.4, 12.6, 12.7, 12.4, 12.9)
+n = length(bac)
+xbar = mean(bac)
+s = sd(bac)
+c(n, xbar, s)
+```
+
+1. Hypothesis
+
+$$H_0: \mu = 12.6 \ \ \ \text{vs} \ \ \ H_1: \mu \ne 12.6$$
+
+2. Assumptions 
+
+$X_1,\ X_2,\ ...,\ X_n$ are $\text{i.i.d}$ random variables and follow $N(\mu,\sigma^2)$
+
+We can check for the normality assumption using a box plot (looking for symmetry) or a normal quantile-quantile plot (looking for the points being close to the straight line).
+
+```{r}
+par(mfrow = c(1, 2))
+boxplot(bac)
+qqnorm(bac)
+qqline(bac)
+```
+
+In the figure above, there’s some indication of some skewness in the box plot (the lower tail is shorter than the upper tail and the median is closer to the first quartile than the third quartile) and Q-Q plot (small departure at the lower end), but it’s not too bad, so we can say the normality assumption is approximately satisfied.
+
+```{r}
+t0 = (mean(bac) - 12.6)/(sd(bac)/sqrt(n))
+t0
+```
+
+3. Test Statistic
+
+$$T = \frac{\bar{X} - \mu_0}{S/\sqrt{n}}\sim t_{30-1}\ \ \text{Under} \ H_0$$
+
+4. Observed Test Statistic
+
+$$t_0 = \frac{\bar{x} - \mu_0}{s/\sqrt{n}} = 2.644$$
+
+```{r}
+qt(c(0.9, 0.95, 0.975), df = 29)
+```
+
+⚠️ We choose a critical value $c$ such that $2P(t_{29}\ge c)=0.05$, since it's a two-sided test.
+
+Therefore, the correct critical value is $c=2.045230$, as $2P(t_{29}\ge2.045)=0.05$.
+
+The observed test statistic $t_0=2.644$ is larger than the critical value $c=2.045$ we reject $H_0$.
+
+Why? 👉 Since $2P(t_{29}\ge2.644)$ is smaller than $2P(t_{29}\ge2.045)=0.05$.
+
+```{r}
+2*pt(t0, df = 29, lower.tail = FALSE) # P(t_29 > 2.644)
+```
+
+```{r}
+t.test(bac, mu = 12.6, alternative = "two.sided")
+```
+
+5. P-value
+
+$2P(T \ge |t_0|) = 2P(t_{29} \ge 2.644) = 0.013$
+
+6. Decision
+
+Since the p-value is less than $\alpha = 0.05$, we reject $H_0$.
+
+## Life satisfaction
+
+### Two-sample $t$-test
+
+Two sample t-test because we have two independent populations, one set of observations sampled from a “young” population and another set of observations from an “old” population.
+
+```{r}
+Young = c(24, 26, 40, 29, 29, 41, 32, 19, 23, 25, 37, 31, 31, 29, 24, 
+          42, 32, 13, 33, 25, 20, 26, 20, 23, 23, 15, 34, 29, 20, 38)
+Old = c(27, 26, 45, 34, 34, 45, 36, 20, 22, 24, 35, 31, 26, 41, 31, 
+        37, 31, 12, 38, 26, 22, 27, 21, 31, 23, 24, 27, 33, 22, 40)
+```
+
+```{r}
+# Base R approach:
+c(length(Young), length(Old))
+```
+
+```{r}
+c(mean(Old), mean(Young), mean(Old-Young))
+```
+
+```{r}
+c(sd(Old), sd(Young), sd(Old-Young))
+```
+
+```{r}
+# tidyverse method
+dat = tibble(satisfaction = c(Young, Old), # life satisfaction score of each subject
+             age = c(rep("Young", length(Young)), # age group indicator
+                     rep("Old", length(Old))))
+dat %>% 
+  group_by(age) %>% 
+  summarise(n = n(),
+            mean = mean(satisfaction),
+            sd = sd(satisfaction))
+```
+
+```{r}
+# some quantiles from distributions
+qt(c(0.025,0.05,0.1), df = 58)
+```
+
+```{r}
+qnorm(c(0.025,0.05,0.1))
+```
+
+1. Hypothesis
+
+$$H_0: \mu_O = \mu_Y \ \ \ \text{vs} \ \ \ H_1: \mu_O \ne \mu_Y$$
+
+2. Assumptions
+
+- $X_1,\ X_2,\ ...,\ X_n$ are $\text{i.i.d}$ random variables and follow $N(\mu_X,\sigma^2)$
+- $Y_1,\ Y_2,\ ...,\ Y_n$ are $\text{i.i.d}$ random variables and follow $N(\mu_Y,\sigma^2)$
+- Two populations are independent of each other
+
+```{r}
+# Quick visualisation using base R (not ggplot)
+par(mfrow = c(1,2))
+boxplot(Young, Old,names = c('Young','Old')) # the two groups seem to have an equal variance
+
+boxplot(Old - Young) # the distribution of the mean difference is approximately normal
+axis(1, at = 1, labels = 'Old - Young')
+```
+
+- Both boxplots for young and old look symmetric with no outliers - justifying the assumption of normality (or could mention that  is large)
+- Young seems to have slightly lower spread than old, but not concerning for assumption of equal variance.
+- Independence assumption doesn’t appear to be violated based on the way the data was collected in the question proposed.
+
+3. Test Statistic
+
+$$T = \frac{\bar{X} - \bar{Y}}{S_p\sqrt{\frac{1}{n_x} + \frac{1}{n_y}}}\sim t_{n_x + n_y - 2}\ \ \text{under} \ H_0 \ \ \text{where}\ S_p^2 = \frac{(n_x-1)S_x^2 + (n_y-1)S_y^2}{n_x+n_y-2}$$
+
+4. Observed Test Statistic
+
+$$t_0 = \frac{\bar{x} - \bar{y}}{s_p\sqrt{\frac{1}{n_x} + \frac{1}{n_y}}}\sim t_{n_x + n_y - 2} = 0.9803 \ \ \text{where}\ s_p^2 = \frac{(n_x-1)s_x^2 + (n_y-1)s_y^2}{n_x+n_y-2}$$
+
+```{r}
+n_o = length(Old)
+n_y = length(Young)
+
+mu_o = mean(Old)
+mu_y = mean(Young)
+
+s_o = sd(Old)
+s_y = sd(Young)
+
+# pooled sample variance
+s2_p = ((n_o - 1)*s_o^2 + (n_y - 1)*s_y^2) / (n_o + n_y - 2)
+
+# pooled sample standard deviation
+s_p = sqrt(s2_p)
+
+t0 = (mu_o - mu_y)/(s_p*sqrt((1/n_y + 1/n_o)))
+t0
+```
+
+```{r}
+qt(c(0.9, 0.95, 0.975), df = 58)
+```
+
+We choose a critical value $c$ such that $2P(t_{58}\ge c)=0.05$, since it's two-sided test.
+
+The correct critical value is $c=2.002$, as $2P(t_{58}\ge2.002)=0.05$.
+
+The observed test statistic $t_0=0.9803$ is smaller than the critical value $c=2.002$, we don't reject $H_0$.
+
+Why? 👉 Since $2P(t_{58}\ge0.9803)$ is greater than $2P(t_{58}\ge2.002)=0.05$.
+
+```{r}
+2*pt(t0, df = n_o + n_y - 2, lower.tail = FALSE)
+```
+
+```{r}
+# when you have two vectors
+t.test(Old, Young, var.equal = TRUE)
+```
+
+5. P-value
+
+$2P(t_{n_x+n_y-2} \ge |t_0|) = 2P(t_{58} \ge 0.9803) = 0.331$
+
+6. Decision
+
+Since the p-value is greater than $\alpha = 0.05$, we don't reject $H_0$
+
+```{r}
+# alternatively, when you have a dataframe
+t.test(satisfaction ~ age, data = dat, var.equal = TRUE)
+
+# alternatively,
+t.test(satisfaction ~ age, data = dat, var.equal = TRUE)
+```
+
+### Paired sample $t$-test
+
+```{r}
+paired_dat = tibble(Young, Old) %>%
+  mutate(Difference = Old - Young)
+glimpse(paired_dat)
+```
+
+```{r}
+paired_dat |> 
+  dplyr::summarise(
+    n = n(),
+    mean_old = mean(Old),
+    sd_old = sd(Old),
+    mean_young = mean(Young),
+    sd_young = sd(Young),
+    mean_diff = mean(Difference),
+    sd_diff = sd(Difference)
+  ) |> 
+  gt::gt() |> 
+  gt::tab_spanner(
+    label = "Old",
+    columns = ends_with("old")
+  ) |> 
+  gt::tab_spanner(
+    label = "Young",
+    columns = ends_with("young")
+  ) |> 
+  gt::tab_spanner(
+    label = "Difference",
+    columns = ends_with("diff")
+  ) |> 
+  gt::cols_label(
+    n = "Sample size",
+    mean_old = "Mean",
+    sd_old = "SD",
+    mean_young = "Mean",
+    sd_young = "SD",
+    mean_diff = "Mean",
+    sd_diff = "SD"
+  ) |> 
+  gt::fmt_number(
+    columns = starts_with("mean"),
+    decimals = 2
+  )|> 
+  gt::fmt_number(
+    columns = starts_with("sd"),
+    decimals = 2
+  )
+```
+
+1. Hypothesis
+
+$$H_0: \mu_d = 0 \ \ \ \text{vs} \ \ \ H_1: \mu_d \ne 0$$
+
+2. Assumptions
+
+$D_1,\ D_2,\ ...,\ D_n$ are $\text{i.i.d}$ random variables and follow $N(\mu_d,\sigma^2)$
+
+3. Test Statistic
+
+$$T = \frac{\bar{D}}{S_d/\sqrt{n}}\sim t_{n-1}\ \ \text{Under} \ H_0$$
+
+4. Observed Test Statistic
+
+$$T = \frac{\bar{x_d} - 0}{s_d/\sqrt{n}}\sim t_{n-1} = 2.5354$$
+
+```{r}
+t.test(x = Old, y = Young, paired = TRUE)
+```
+
+```{r}
+# note that we're using differences, not paired data
+t.test(paired_dat$Difference, mu = 0)
+```
+
+⚠️ Note that the above test is a one-sample $t$-test, as we calculated the difference between paired measurements (like $\text{After} - \text{Before}$) and treated each difference value as a *single* observation to test whether $\mu_d = 0$. Thus, $df=29$, unlike the two-sample $t$-test above where $df = n_x + n_y - 2 = 58$.
+
+If we don't calculate the difference between paired measurements and use two vectors, we have to specify `paired = TRUE` to perform the same paired sample $t$-test.
+
+
+5. P-value
+
+$2P(t_{n-1} \ge |t_0|) = P(|t_{29}| \ge 2.5354) = 0.01688$
+
+6. Decision
+
+Since the p-value is less than $\alpha = 0.05$, we reject $H_0$
+
+
+## Power, effect size and sample size
+
+### Calculating effect size given a test statistic
+
+```{r}
+n = 25 + 1
+d = 3.24/sqrt(n)
+d
+```
+
+### pwr.t.test()
+
+```{r}
+library(pwr)
+pwr.t.test(d = 0.4, power = 0.8, sig.level = 0.05, alternative = "two.sided",
+           type = "two.sample")
+```
+
+We would need 100 people in each group to achieve a power of at least 80%.
+
+```{r}
+d_vals = seq(0.1, 0.8, 0.01) # a sequence of the effect size (cohen's d)
+req_n = NULL
+
+# for each effect size, calculate the required sample size to achieve 80% statistical power and store it in req_n
+for (i in seq_along(d_vals)) {
+    req_n[i] = pwr.t.test(d = d_vals[i], power = 0.8, sig.level = 0.05,
+        alternative = "two.sided", type = "two.sample")$n
+}
+plot(d_vals, req_n, type = "l")
+abline(v = 0.4, lty = 2)
+abline(h = 100, lty = 2)
+```
+
+We can see how large $n$ has to be, as Cohen's $d$ decreases to achieve 80% statistical power. Note that $d=\frac{t_0}{\sqrt{n}}$ becomes small when $t_0 = \bar{x}-\mu_0$ is small (i.e. when $\bar{x}$ is not so far apart from the null hypothesised mean $\mu_0$). This suggests that we need a large sample size when we observe a small test statistic to achieve a certain level of power.
+

@@ -1,0 +1,388 @@
+---
+title: "Week 4 Lab"
+date: "`r Sys.Date()`"
+author: "Tutor: Sanghyun Kim"
+output: 
+  html_document: 
+    ### IMPORTANT ###
+    # self_contained: true # Creates a single HTML file as output
+    code_folding: hide # Code folding; allows you to show/hide code chunks
+    ### USEFUL ###
+    code_download: true # Includes a menu to download the code file
+    ### OPTIONAL ###
+    df_print: paged # Sets how dataframes are automatically printed
+    theme: readable # Controls the font, colours, etc.
+    toc: true # (Useful) Creates a table of contents!
+    toc_float: true # table of contents at the side
+    number_sections: false # (Optional) Puts numbers next to heading/subheadings
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(message = FALSE, warning = FALSE)
+```
+
+```{r}
+library(tidyverse)
+theme_set(theme_bw())
+```
+
+# Week 3 Lecture Recap
+
+## Chi-squared Test
+
+|   Types of Chi-squared Test   |  Goodness-of-Fit  |  Homogeneity  |  Independence  |
+|:----|:----|:----|:----|
+| **Sample** | Single independent sample | *Two (or more) independent* samples, each of which is categorised according to the same set of outcomes | *A single dependent* sample split into subgroups according to two categorical *attributes* (variables) |
+| **Purpose** | Does our data follow a given (known) distribution? | Are proportions of each outcome group the same across different two or more independent populations? | Within a single population, are the two categorical attributes independent? |
+| $H_0$ | Our data follows a given (known) distribution | The proportion of each outcome group is the same across different populations | There's no association between the two categorical attributes |
+\
+
+# Exercises
+
+## Personality Type
+
+|      |  Open  |  Conscientious  |  Extrovert  |  Agreeable  |  Neurotic  | Row Total |
+|:----:|:----:|:----:|:----:|:----:|:----:|:----:|
+| **Business** | $p_{11}$ | $p_{12}$ | $p_{13}$ | $p_{14}$ | $p_{15}$ | $p_{1\bullet}$ |
+| **Social Science** | $p_{21}$ | $p_{22}$ | $p_{23}$ | $p_{24}$ | $p_{25}$ | $p_{2\bullet}$ |
+| **Column Total** | $p_{\bullet 1}$ | $p_{\bullet 2}$ | $p_{\bullet 3}$ | $p_{\bullet 4}$ | $p_{\bullet 5}$ | $p_{\bullet\bullet}=1$ |
+
+where $p_{i\bullet}=\sum_{j=1}^{5}p_{ij}$ and $p_{\bullet j}=\sum_{i=1}^{2}p_{ij}$
+
+```{r}
+counts = c(41, 52, 46, 61, 58, 72, 75, 63, 80, 65)
+c_mat = matrix(counts, nrow = 2, byrow = TRUE)
+colnames(c_mat) = c("Open", "Conscientious", "Extrovert", "Agreeable", "Neurotic")
+rownames(c_mat) = c("Business", "Social Science")
+c_mat
+```
+
+```{r}
+par(mar = c(0, 1, 1, 0)) # controls the margins of this base R plot
+mosaicplot(t(c_mat), main = NULL)
+```
+
+In a mosaic plot, the lengths of the rectangles across are proportional to the number of cells across both the x and the y axes. It’s a generalisation of a stacked bar chart where the bars lengths are proportional to the number in each category.
+
+To visualise the data using ggplot2, we need to first create a data frame:
+
+```{r}
+df = tibble::tibble(counts = counts,
+                    major = c(rep("Business", 5), rep("Social science",5)),
+                    personality = rep(c("Open","Conscientious","Extrovert","Agreeable","Neurotic"), 2))
+df
+```
+
+```{r}
+df %>% 
+  ggplot() + 
+  aes(x = major, y = counts, fill = personality) + 
+  geom_col() + 
+  scale_fill_brewer(palette = "Set1") + 
+  coord_flip() + 
+  labs(y = "Number of students", x = "Major", fill = "Personality type") + 
+  guides(fill = guide_legend(reverse = TRUE)) + 
+  theme(legend.position = "top")
+```
+
+```{r}
+df %>% 
+  ggplot() + 
+  aes(x = major, y = counts, fill = personality) + 
+  geom_col(position = "fill") + 
+  scale_fill_brewer(palette = "Set1") + 
+  coord_flip() + 
+  labs(y = "Percent of students", x = "Major", fill = "Personality type") +
+  scale_y_continuous(labels = scales::percent) + 
+  guides(fill = guide_legend(reverse = TRUE)) + 
+  theme(legend.position = "top")
+```
+
+The most appropriate test here is a test for homogeneity because we have sampled from two different populations (the population of business students and the population of social science students).
+
+```{r}
+chisq.test(c_mat)
+```
+
+```{r}
+# expected counts
+chisq.test(c_mat)$expected %>%
+  round(1)
+```
+
+1. Hypothesis
+
+$$H_0: p_{11}=p_{21},\ p_{12}=p_{22},\ p_{13}=p_{23},\ p_{14}=p_{24},\ p_{15}=p_{25} \ \ \ \text{vs} \ \ \ H_1: \text{the distribution of outcomes differs across the 2 populations}$$
+
+2. Assumption
+
+- $e_{ij}=\frac{y_{i\bullet} \times y_{\bullet j}}{n}\ge5 \ \ \text{for all} \ i, \ j$
+
+3. Test Statistic
+
+$$T=\sum_{i=1}^{2}\sum_{j=1}^{5}{\frac{(Y_{ij}-y_{i\bullet}y_{\bullet j}/n)^2}{y_{i\bullet}y_{\bullet j}/n}}\sim\chi_{(2-1)(5-1)}^2 \ \ \text{Under} \ H_0$$
+
+4. Observed Test Statistic
+
+$$t_0=\sum_{i=1}^{2}\sum_{j=1}^{5}{\frac{(Y_{ij}-e_{ij})^2}{e_{ij}}}\sim\chi_{(2-1)(5-1)}^2=3.006\ \ \text{Under} \ H_0$$
+
+5. P-value
+
+$$P(T\ge t_0) = P(\chi_{4}^2\ge3.006) = 0.5568$$
+
+6. Decision
+
+Since the p-value is greater than $\alpha=0.05$, we don't reject $H_0$, meaning that there is insufficient evidence to conclude that the distribution of personality types is different for business and social science majors. Another way of saying this is: the data are consistent with the null hypothesis that the distribution of personality types is the same across business and social science majors.
+
+## Shocking
+
+### Chi-squared Test of Homogeneity
+
+⚠️ It sounds like this is a chi-squared test of independence due to the fact that we sampled data from a single population.
+
+However, this is a chi-squared test of homogeneity, since the anxiety status is **a condition that we imposed**, not an attribute of samples. **We randomly divided samples into two independent groups by a condition that we imposed**. In a sense that we have **two independent sub-populations**, the appropriate test in this case is a chi-squared test for homogeneity.
+
+```{r}
+counts = c(12, 5, 4, 9)
+c_mat = matrix(counts, ncol = 2, byrow = TRUE)
+colnames(c_mat) = c("Together", "Alone")
+rownames(c_mat) = c("High", "Low")
+c_mat
+```
+
+### Fisher's exact test
+
+When do we use it?
+
+👉 When the $e_{ij}<5$ for at least one cell (or a sample size is small)
+
+Procedure:
+\
+1. Consider all possible contingency tables
+\
+2. Enumerate all tables as or more extreme than the observed contingency table **while fixing row and column totals**
+\
+3. For each of these **more extreme** tables we obtained in step 2, calculate the probability of observing that table
+\
+4. Sum the probabilities up to get the exact p-value
+
+```{r}
+fisher.test(c_mat)
+```
+
+### Chi-squared test without a continuity correction
+
+```{r}
+# without the continuity correction
+chisq.test(c_mat, correct = FALSE)
+```
+
+### Yates' corrected chi-squared test
+
+```{r}
+chisq.test(c_mat, correct = TRUE)
+```
+
+### Monte Carlo Simulation
+
+Why do we use it?
+
+👉 **Non-parametric**: no assumption about the underlying distribution of the population is required
+
+1. Resample the original contingency table with replacement lots of times (B times), while keeping row/column totals the same
+\
+2. For each of these resampled contingency tables, calculate a (resampled) test statistic
+\
+3. Draw a distribution of these B many resampled test statistics
+\
+4. Calculate the proportion of resampled test statistics as or more extreme than the test statistic calculated from the original contingency table to get a Monte Carlo p-value
+
+```{r}
+set.seed(1)
+chisq.test(c_mat, simulate.p.value = TRUE, B = 20000)
+```
+
+```{r}
+# if you want to do the simulation 'manually':
+# 1. extract the test statistic from the original data
+test_stat = chisq.test(c_mat, correct = FALSE)$statistic
+
+# 2. generate 20000 tables with the same margins as the observed data
+set.seed(2002)
+rand_tables = r2dtable(n = 20000, r = rowSums(c_mat), c = colSums(c_mat))
+
+# 3. calculate the the test statistic (without a continuity correction) for each of the randomly generated tables
+# Notes:
+# lapply() applies a function to each of the elements in a list
+# unlist() takes a list and converts it to a vector
+sim_stats = unlist(lapply(rand_tables, function(x) chisq.test(x, correct = FALSE)$statistic))
+
+# 4. have a look at the distribution of the test statistics that
+# were generated under the null hypothesis of independence
+hist(sim_stats, breaks = 30)
+```
+
+```{r}
+# 5. calculate the Monte Carlo p-value as the proportion of
+# simulated test statistics that are more extreme than the text
+# statistic that we observed
+mean(sim_stats >= test_stat)
+```
+
+Only the chi-squared test without the continuity correction gave a p-value that was less than 0.05. We’re more convinced by the other approaches which give more reliable results, particularly when the sample sizes are small. The Monte Carlo p-value is very similar to Fisher’s exact test (these would be our most preferred solutions) while the p-value for a chi-squared test with continuity correction is slightly larger.
+
+### Odds ratio
+
+```{r}
+mosaic::oddsRatio(c_mat[2:1, ], verbose = TRUE)
+```
+
+For the 2.3 relative risk, we’re saying that subjects who were told that it would be a painful shock were 2.3 times more likely to wait together than subjects who were told it wouldn’t be painful.
+
+For the 5.4 odds ratio, we’re saying that the odds of waiting together for the painful shock group are 5.4 times the odds of waiting together for the mild shock group.
+
+The null hypothesis is that the odds ratio is equal to 1 (no association). The 95% confidence interval for the odds ratio, (1.12, 26.04) does not contain 1, therefore we would reject the null hypothesis. HOWEVER, remember that the calculation of the confidence interval for the odds ratio, relied on similar assumptions to the chi-squared test, i.e. we need “reasonably large” sample sizes in each of the cells (can think of this as the expected cell counts of at least 5 assumption).
+
+## Asbestos
+
+```{r}
+# create a contingency table in a form of a matrix
+asbestos = matrix(c(310, 212, 21, 25, 7, 36, 158, 35, 102, 35, 0, 9, 17, 49, 51, 0, 0, 4, 18, 28), nrow = 5)
+colnames(asbestos) = c("None", "Grade 1", "Grade 2", "Grade 3")
+rownames(asbestos) = c("0-9", "10-19", "20-29", "30-39", "40+")
+
+y = asbestos %>% 
+  as.data.frame() %>% # convert the matrix to a dataframe
+  tibble::rownames_to_column(var = "years") %>%  # treat row names (year group) as a column
+  tidyr::gather(key = grade, value = count, -years) # convert the dataframe from a long format to a wide format (equivalent to pivot_longer)
+
+# treat the grade variable as a factor variable instead of character variable
+y$grade = factor(y$grade, levels = c("None", "Grade 1", "Grade 2", "Grade 3"), ordered = TRUE)
+
+y %>% 
+  ggplot() +
+  aes(x = years, y = count, fill = grade) +
+  geom_bar(stat = "identity") + # when you use a count variable (numbers) as a y variable, you have to set stat = "identiy"
+  theme_bw(base_size = 16) + # change the theme just for aesthetics (base font size = 16)
+  scale_fill_brewer(palette = "Set1") + # use a built-in R colour palette "Set1" just for aesthetics
+  labs(fill = "", y = "Count", x = "Occupational exposure (yrs)") # relabel the plot
+```
+
+### Data Visualisation
+
+```{r}
+y %>% 
+  ggplot() +
+  aes(x = years, y = count, fill = grade) +
+  geom_bar(stat = "identity", position = "fill") + # make the above bar chart a stacked bar chart by specifying position = "fill" to see the proportions (not raw counts) for each occupational exposure group
+  theme_bw(base_size = 12) +
+  scale_fill_brewer(palette = "Set1") +
+  labs(fill = "", y = "Proportion", x = "Occupational exposure (yrs)")
+```
+
+### Chi-squared Test of Independence
+
+|      |  None  |  Grade 1  |  Grade 2  |  Grade 3  |  Row Total  |
+|:----:|:----:|:----:|:----:|:----:|:----:|
+| **0-9** | $p_{11}$ | $p_{12}$ | $p_{13}$ | $p_{14}$ | $p_{1\bullet}$ |
+| **10-19** | $p_{21}$ | $p_{22}$ | $p_{23}$ | $p_{24}$ | $p_{2\bullet}$ |
+| **20-29** | $p_{31}$ | $p_{32}$ | $p_{33}$ | $p_{34}$ | $p_{3\bullet}$ |
+| **30-39** | $p_{41}$ | $p_{42}$ | $p_{43}$ | $p_{44}$ | $p_{4\bullet}$ |
+| **40 +** | $p_{51}$ | $p_{52}$ | $p_{53}$ | $p_{54}$ | $p_{5\bullet}$ |
+| **Column Total** | $p_{\bullet 1}$ | $p_{\bullet 2}$ | $p_{\bullet 3}$ | $p_{\bullet 4}$ | $p_{\bullet\bullet}=1$ |
+
+where $p_{i\bullet}=\sum_{j=1}^{4}p_{ij}$ and $p_{\bullet j}=\sum_{i=1}^{5}p_{ij}$
+
+```{r}
+chisq.test(asbestos)
+```
+
+```{r}
+# expected counts
+chisq.test(asbestos)$expected %>%
+    round(1)
+```
+
+```{r}
+# observed test statistic calculated from the original contingency table
+t0 = chisq.test(asbestos)$statistic
+t0
+```
+
+1. Hypothesis
+
+$$H_0: p_{ij}=p_{i\bullet}p_{\bullet j}\ \ \text{for}\ i = 1,\ 2,\, 3,\ 4,\ 5 \ \ \text{and}\ \  j=1,\ 2,\ 3,\ 4 \ \ \ \text{vs} \ \ \ H_1: \text{The occupational exposure is not independent of the asbestos grade diagnosed}$$
+
+2. Assumption
+
+- $e_{ij}=\frac{y_{i\bullet} \times y_{\bullet j}}{n}\ge5 \ \ \text{for all} \ i, \ j$
+
+3. Test Statistic
+
+$$T=\sum_{i=1}^{5}\sum_{j=1}^{4}{\frac{(Y_{ij}-y_{i\bullet}y_{\bullet j}/n)^2}{y_{i\bullet}y_{\bullet j}/n}}\sim\chi_{(5-1)(4-1)}^2 \ \ \text{Under} \ H_0$$
+
+4. Observed Test Statistic
+
+$$t_0=\sum_{i=1}^{5}\sum_{j=1}^{4}{\frac{(Y_{ij}-e_{ij})^2}{e_{ij}}}\sim\chi_{(5-1)(4-1)}^2=648.81\ \ \text{Under} \ H_0$$
+
+5. P-value
+
+$$P(T\ge t_0) = P(\chi_{12}^2\ge648.81) = 0$$
+
+6. Decision
+
+Since the p-value is less than $\alpha=0.05$, we reject $H_0$, meaning that the occupational exposure is not independent of the asbestos grade diagnosed.
+
+
+### Permutation Test
+
+```{r}
+row_totals = rowSums(asbestos)
+row_totals
+```
+
+```{r}
+col_totals = colSums(asbestos)
+col_totals
+```
+
+```{r}
+set.seed(2018)
+rnd = r2dtable(n = 1, r = row_totals, c = col_totals) # randomly resample the original contingency table only once
+chisq.test(rnd[[1]])$statistic # a resampled test statistic calculated from the randomly resampled contingency table above.
+```
+
+```{r}
+# Monte Carlo simulation with 10000 times
+B = 10000
+stat = numeric(length = B) # initialise an empty vector that will store resampled test statistics later
+set.seed(2002)
+tables = r2dtable(n = B, r = row_totals, c = col_totals) # randomly resample the original contingency table 10000 times
+
+# for each of the 10000 resampled contingency tables, calculate a test statistic, extract it, and store it in the stat vector
+# method 1: use a for loop
+for (i in 1:B) {
+    stat[i] = suppressWarnings(chisq.test(tables[[i]], )$statistic) 
+}
+
+# alternative approach (method 2)
+# apply a function that extracts a test statistic to each of the resampled contingency tables in the "tables" R object
+stat = sapply(tables, function(x) suppressWarnings(chisq.test(x)$statistic))
+
+# calculate the Mote Carlo p-value
+mc_pval = mean(stat >= t0)
+mc_pval
+```
+
+```{r}
+# distribution of 10000 test statistics
+hist(stat, xlab = "Test Statistics")
+# we can see that the proportion of test statistics, as or more extreme than the observed test statistic (648.81) is almost 0
+```
+
+```{r}
+# Monte Carlo simulation with the chisq.test function
+chisq.test(asbestos, simulate.p.value = TRUE, B = B)
+```
+

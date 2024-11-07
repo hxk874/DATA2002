@@ -1,10 +1,136 @@
 ---
-title: "Lab 04"
-output: html_document
+title: "Lab 01C: Week 4"
+author: "Ellen Ebdrup"
 date: "2024-08-22"
+output: 
+  html_document: 
+    ### IMPORTANT ###
+    # self_contained: true # Creates a single HTML file as output
+    code_folding: show # Code folding; allows you to show/hide code chunks
+    ### USEFUL ###
+    code_download: true # Includes a menu to download the code file
+    ### OPTIONAL ###
+    df_print: paged # Sets how dataframes are automatically printed
+    theme: readable # Controls the font, colours, etc.
+    toc: true # (Useful) Creates a table of contents!
+    toc_float: true # table of contents at the side
+    number_sections: false # (Optional) Puts numbers next to heading/subheadings
 ---
 
-# Personality type
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(message = FALSE, warning = FALSE)
+```
+
+```{r, echo=FALSE}
+library(tidyverse)
+library(knitr)
+library(ggplot2)
+library(dplyr)
+library(janitor)
+library(lubridate)
+```
+
+# Quick Quiz
+
+## TV violence
+
+A study of the amount of violence viewed on television as it relates to the age of the viewer yields the results shown in the accompanying table for 81 people.
+ 
+```{r, echo=FALSE}
+# Define the data in a matrix format for clearer organization
+data <- matrix(
+  c(8, 12, 21, 18, 15, 7),
+  nrow = 2,
+  byrow = TRUE,
+  dimnames = list(
+    c("Low violence", "High violence"),
+    c(" 16-34 ", " 35-54 ", " 55 and over ")
+  )
+)
+
+# Generate the table with a caption
+kable(data, caption = "Age", 
+      row.names = TRUE,
+      full_width = F)
+```
+ 
+ 
+```{r, echo=FALSE}
+# Define the data as a data frame
+data <- data.frame(
+  Smoked = c("Yes", "No"),
+  `Heart attack (Yes)` = c(33, 167),
+  `Heart attack (No)` = c(18, 182)
+)
+
+# Set row names for the first column
+row.names(data) <- data$Smoked
+data$Smoked <- NULL
+
+# Generate the table with a caption
+kable(data, col.names = c("Smoked / Heart Attack", "Yes", "No"))
+```
+
+Does it look like there’s a significant relationship between age group and violence viewing preference? No need to do a test at this point, just consider the numbers, and the visualisations below.
+
+```{r}
+x = matrix(c(8, 18, 12, 15, 21, 7), ncol = 3)
+colnames(x) = c("16-34", "35-54", "54+")
+rownames(x) = c("Low violence", "High violence")
+y = x |> as.data.frame() |> 
+  tibble::rownames_to_column(var = "viewing") |> 
+  tidyr::pivot_longer(cols = c("16-34", "35-54", "54+"), 
+                      names_to = "age", values_to = "count")
+p_base = ggplot(y, aes(x = age, y = count, fill = viewing)) + 
+  theme_bw(base_size = 12) + 
+  scale_fill_brewer(palette = "Set1") + 
+  labs(fill = "", x = "Age group") +
+  theme(legend.position = "top")
+p1 = p_base + 
+  geom_bar(stat = "identity") + 
+  labs(y = "Count") 
+p2 = p_base + 
+  geom_bar(stat = "identity", position = "fill") + 
+  labs(y = "Proportion")
+gridExtra::grid.arrange(p1, p2, ncol = 2)
+```
+
+
+## Income and IQ
+
+103 children attending a pre-school were classified by parents’ income group and by IQ (intelligence quotient).
+
+ 
+
+Does it look like the fractions of IQ differ significantly in the three income groups? No need to do a test at this point, just consider the observed counts, and the visualisations below.
+
+```{r}
+x = matrix(c(14, 25, 23, 18, 8, 15), ncol = 2)
+colnames(x) = c("High IQ", "Moderate/low IQ")
+rownames(x) = c("A", "B", "C")
+y = x |> as.data.frame() |> 
+  tibble::rownames_to_column(var = "income") |> 
+  tidyr::pivot_longer(c("High IQ", "Moderate/low IQ"), 
+                      names_to = "iq", values_to = "count")
+p_base = ggplot(y, aes(x = income, y = count, fill = iq)) + 
+  theme_bw(base_size = 12) + 
+  scale_fill_brewer(palette = "Set1") + 
+  labs(fill = "", x = "Income group") +
+  theme(legend.position = "top")
+p1 = p_base + 
+  geom_bar(stat = "identity") + 
+  labs(y = "Count") 
+p2 = p_base + 
+  geom_bar(stat = "identity", position = "fill") + 
+  labs(y = "Proportion")
+gridExtra::grid.arrange(p1, p2, ncol = 2)
+```
+
+
+# Exercises
+
+## Personality type
 
 1. Visualise the data. 
 
@@ -20,6 +146,7 @@ mosaicplot(t(c_mat))
 ```{r}
 install.packages("reshape2")
 ```
+
 
 
 
