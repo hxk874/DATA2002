@@ -19,7 +19,7 @@ output:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-knitr::opts_chunk$set(message = FALSE, warning = FALSE)
+knitr::opts_chunk$set(message = FALSE)
 ```
 
 ```{r, echo=FALSE}
@@ -57,9 +57,10 @@ data <- matrix(
   )
 )
 
-# Generate the table with a caption
-kable(data, caption = "Age", 
-      row.names = TRUE,
+data %>%
+  kbl(caption = "Age", 
+      row.names = TRUE) %>%
+  kable_styling(
       full_width = F)
 ```
 
@@ -309,7 +310,7 @@ iv)  A chi-squared test using a Monte Carlo p-value (i.e. using simulation).
 
 
 
-### Perform test
+2 Perform test
 At the 5% level of significance perform each of the following tests:
 
 ```{r}
@@ -321,18 +322,28 @@ c_mat
 ```
 
 
-i) Fisher’s exact test
+#### Fisher’s exact test
 
-- Non-parametric. 
-- Doesn't assume an underlying distribution.
+When do we use it?
+
+👉 When the $e_{ij}<5$ for at least one cell (or a sample size is small)
+
+Procedure:
+\
+1. Consider all possible contingency tables
+\
+2. Enumerate all tables as or more extreme than the observed contingency table **while fixing row and column totals**
+\
+3. For each of these **more extreme** tables we obtained in step 2, calculate the probability of observing that table
+\
+4. Sum the probabilities up to get the exact p-value
 
 ```{r}
 fisher.test(c_mat)
 ```
 p-value = 0.0634 > 0.05 => we don't reject $h_0$
 
-
-ii)  A chi-squared test without a continuity correction
+####  A chi-squared test without a continuity correction
 
 ```{r}
 chisq.test(c_mat, correct = FALSE)
@@ -341,13 +352,25 @@ p-value = 0.0303 < 0.05 => we reject $h_0$
 
 
 
-iii) A chi-squared test with a continuity correction.
+#### A chi-squared test with a continuity correction.
 ```{r}
 chisq.test(c_mat, correct = TRUE)
 ```
 p-value = 0.07 > 0.05 => we don't reject $h_0$
 
-iv)  A chi-squared test using a Monte Carlo p-value (i.e. using simulation).
+#### A chi-squared test using a Monte Carlo p-value (i.e. using simulation).
+
+Why do we use it?
+
+👉 **Non-parametric**: no assumption about the underlying distribution of the population is required
+
+1. Resample the original contingency table with replacement lots of times (B times), while keeping row/column totals the same
+\
+2. For each of these resampled contingency tables, calculate a (resampled) test statistic
+\
+3. Draw a distribution of these B many resampled test statistics
+\
+4. Calculate the proportion of resampled test statistics as or more extreme than the test statistic calculated from the original contingency table to get a Monte Carlo p-value
 
 ```{r}
 set.seed(1)
@@ -447,7 +470,7 @@ mosaic::oddsRatio(c_mat[2:1,], verbose = TRUE)
 ```
 
 
-## Asbestos
+## Asbestos fibres 
 
 One of the breakthroughs that demonstrated the dangers to the exposure of asbestos is due to a study undertaken in the 1960’s (data reported in Selikoff (1981)). Chest x-rays of a sample of 1117 workers in New York were taken to determine the damage done due to the occupational exposure of the workers to asbestos fibres. These workers were classified according to their years of exposure to the fibres and the severity of asbestosis that they were diagnosed with. The data appear in the following contingency table
 
@@ -465,15 +488,21 @@ df %>%
 
 
 ```{r}
-y = asbestos |> as.data.frame() |> 
-  tibble::rownames_to_column(var = "years") |> 
-  tidyr::gather(key = grade, value = count, -years)
+y = asbestos %>% 
+  as.data.frame() %>% # convert the matrix to a dataframe
+  tibble::rownames_to_column(var = "years") %>%  # treat row names (year group) as a column
+  tidyr::gather(key = grade, value = count, -years) # convert the dataframe from a long format to a wide format (equivalent to pivot_longer)
+
+# treat the grade variable as a factor variable instead of character variable
 y$grade = factor(y$grade, levels = c("None", "Grade 1", "Grade 2", "Grade 3"), ordered = TRUE)
-ggplot(y, aes(x = years, y = count, fill = grade)) + 
-  geom_bar(stat = "identity") + 
-  theme_grey() + 
-  scale_fill_brewer(palette = "Set1") + 
-  labs(fill = "", y = "Count", x = "Occupational exposure (yrs)")
+
+y %>% 
+  ggplot() +
+  aes(x = years, y = count, fill = grade) +
+  geom_bar(stat = "identity") + # when you use a count variable (numbers) as a y variable, you have to set stat = "identiy"
+  theme_grey(base_size = 16) + # change the theme just for aesthetics (base font size = 16)
+  scale_fill_brewer(palette = "Set1") + # use a built-in R colour palette "Set1" just for aesthetics
+  labs(fill = "", y = "Count", x = "Occupational exposure (yrs)") # relabel the plot
 ```
 
 1. Adapt the **ggplot2** code above such that the y-axis is a proportion within each exposure length group. Does it look like there’s a relationship between the two variables?
@@ -493,20 +522,126 @@ ggplot(y, aes(x = years, y = count, fill = grade)) +
 
 
 
-2. Use the function `chisq.test()` to perform a standard chi-squared test of independence to determine whether there exists a statistically significant association between years of exposure to asbestos fibres and the severity of asbestosis that they were diagnosed with.
+2. Use the function `chisq.test()` to perform a standard chi-squared test of **independence** to determine whether there exists a statistically significant association between years of exposure to asbestos fibres and the severity of asbestosis that they were diagnosed with.
 
-We cant use chi test, since expected is < 5 at the rightmost column
-=> p-value = 0 < 0.05 => we reject the $H_0$
+
+|      |  None  |  Grade 1  |  Grade 2  |  Grade 3  |  Row Total  |
+|:----:|:----:|:----:|:----:|:----:|:----:|
+| **0-9** | $p_{11}$ | $p_{12}$ | $p_{13}$ | $p_{14}$ | $p_{1\bullet}$ |
+| **10-19** | $p_{21}$ | $p_{22}$ | $p_{23}$ | $p_{24}$ | $p_{2\bullet}$ |
+| **20-29** | $p_{31}$ | $p_{32}$ | $p_{33}$ | $p_{34}$ | $p_{3\bullet}$ |
+| **30-39** | $p_{41}$ | $p_{42}$ | $p_{43}$ | $p_{44}$ | $p_{4\bullet}$ |
+| **40 +** | $p_{51}$ | $p_{52}$ | $p_{53}$ | $p_{54}$ | $p_{5\bullet}$ |
+| **Column Total** | $p_{\bullet 1}$ | $p_{\bullet 2}$ | $p_{\bullet 3}$ | $p_{\bullet 4}$ | $p_{\bullet\bullet}=1$ |
+
+where $p_{i\bullet}=\sum_{j=1}^{4}p_{ij}$ and $p_{\bullet j}=\sum_{i=1}^{5}p_{ij}$
+
+The expected counts are:
+```{r}
+chisq.test(asbestos)$expected %>%
+    round(1) %>%
+  kbl() %>%
+  kable_styling(full_width = F)
+```
+
+**Assumptions**  
+Notice that cell (20-29, Grade 3) = 3.4 < 5. This violates the $e_i = np_i \ge 5 \forall i$
+
+However, an alternative approach is to perform a permutation test, where we still use the test statistic but we no longer compare it to a chi-squared distribution, rather we resample the data in such a way that we know the rows and columns are independent and assuming the marginal totals of the contingency table are fixed.
+
+But if we were to, then we would reject the $H_0$ since the p-value = 0 < 0.05. 
+```{r}
+chisq.test(asbestos)
+```
+**Workflow**
+
+1. Hypothesis
+
+$$H_0: p_{ij}=p_{i\bullet}p_{\bullet j}\ \ \text{for}\ i = 1,\ 2,\, 3,\ 4,\ 5 \ \ \text{and}\ \  j=1,\ 2,\ 3,\ 4 \ \ \ \text{vs} \ \ \ H_1: \text{The occupational exposure is not independent of the asbestos grade diagnosed}$$
+
+2. Assumption
+
+$$e_{ij}=\frac{y_{i\bullet} \times y_{\bullet j}}{n}\ge5 \ \ \text{for all} \ i, \ j$$
+
+3. Test Statistic
+
+$$T=\sum_{i=1}^{5}\sum_{j=1}^{4}{\frac{(Y_{ij}-y_{i\bullet}y_{\bullet j}/n)^2}{y_{i\bullet}y_{\bullet j}/n}}\sim\chi_{(5-1)(4-1)}^2 \ \ \text{Under} \ H_0$$
+
+4. Observed Test Statistic
+
+$$t_0=\sum_{i=1}^{5}\sum_{j=1}^{4}{\frac{(Y_{ij}-e_{ij})^2}{e_{ij}}}\sim\chi_{(5-1)(4-1)}^2=648.81\ \ \text{Under} \ H_0$$
+
+5. P-value
+
+$$P(T\ge t_0) = P(\chi_{12}^2\ge648.81) = 0$$
+
+6. Decision
+
+The chi-squared test returns a very small p-value. Hence, there is evidence to suggest that a statistically significant association exists between exposure to asbestos fibres and the severity of asbestosis that a worker is diagnosed with.
+
+
 
 3. Use `x = r2dtable(____)` to randomly generate a contingency table with the same row and column totals as `asbestos`. Perform a chi-squared test and extract the test statistic using `chisq.test(x[[1]])$statistic`.
+
+```{r}
+row_totals = rowSums(asbestos)
+row_totals
+```
+
+```{r}
+col_totals = colSums(asbestos)
+col_totals
+```
+
+Now we can use the `r2dtable()` function to randomly generate a contingency table with the same row and column totals:
+
+```{r}
+set.seed(2018)
+rnd = r2dtable(n = 1, r = row_totals, c = col_totals) # randomly resample the original contingency table only once
+chisq.test(rnd[[1]])$statistic # a resampled t_0 calculated from the randomly resampled contingency table above.
+```
 
 
 4. By using the `r2dtable()` function, perform a Monte-Carlo simulation to determine the p-value for the chi-squared test of independence. Generate 10,000 bootstrap resamples. Note: if doing this in an Rmd script, you might want to wrap your `chisq.test(___)$statistic` in `suppressWarnings()` so they don’t slow down your computer, e.g. `suppressWarnings(chisq.test(___)$statistic)`. Plot a histogram of your Monte Carlo test statistics.
 
+The Monte-Carlo p-value obtained by generating 10,000 contingency tables, computing the chi-squared test statistic for each table and seeing the proportion of these exceed the observed test statistic.
+
+```{r}
+# Monte Carlo simulation with 10000 times
+
+B = 10000 # 10,000 contingency tablesv
+stat = numeric(length = B) # initialise an empty vector that will store resampled test statistics later
+set.seed(2002)
+tables = r2dtable(n = B, r = row_totals, c = col_totals) # randomly resample the original contingency table 10000 times
+
+# for each of the 10000 resampled contingency tables, calculate a test statistic, extract it, and store it in the stat vector
+# method 1: use a for loop
+for (i in 1:B) {
+    stat[i] = suppressWarnings(chisq.test(tables[[i]], )$statistic) 
+}
+
+# alternative approach (method 2)
+# apply a function that extracts a test statistic to each of the resampled contingency tables in the "tables" R object
+stat = sapply(tables, function(x) suppressWarnings(chisq.test(x)$statistic))
+
+# calculate the Mote Carlo p-value
+mc_pval = mean(stat >= t0)
+mc_pval
+```
+
+We can look at the distribution of test statistics:
+```{r}
+# distribution of 10000 test statistics
+hist(stat, xlab = "Test Statistics")
+# we can see that the proportion of test statistics, as or more extreme than the observed test statistic (648.81) is almost 0
+```
+
+There are no permutation test statistics that were more extreme than the test statistic we observed on our original data. From the histogram, we can see that the observed test statistic, 648.8 is way past the range that we would expect to see if the null hypothesis of independence was true.
 
 5. Use the `chisq.test()` function to perform a Monte-Carlo simulation that obtains a p-value. Do so using 10,000 bootstrap resamples.
 
-
-
-
-
+The `chisq.test()` function can do all this for us:
+```{r}
+# Monte Carlo simulation with the chisq.test function
+chisq.test(asbestos, simulate.p.value = TRUE, B = B)
+```
